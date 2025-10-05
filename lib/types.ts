@@ -14,6 +14,16 @@ export type Tax = {
   description: string
   federalTaxCode?: string
   dueDay?: number // Dia do vencimento do imposto (1-31)
+  status: "pending" | "in_progress" | "completed" | "overdue"
+  priority: Priority
+  assignedTo?: string
+  protocol?: string
+  realizationDate?: string
+  notes?: string
+  completedAt?: string
+  completedBy?: string
+  history?: ObligationHistory[]
+  tags?: string[]
   createdAt: string
 }
 
@@ -94,4 +104,35 @@ export type DashboardStats = {
   completedThisMonth: number
   overdueObligations: number
   upcomingThisWeek: number
+}
+
+export type SavedFilter = {
+  id: string
+  name: string
+  filters: {
+    status?: string[]
+    priority?: string[]
+    clientId?: string
+    search?: string
+    dateRange?: { start: string; end: string }
+  }
+  createdAt: string
+}
+
+export type ExportFormat = "excel" | "pdf" | "csv"
+
+export type ExportOptions = {
+  format: ExportFormat
+  includeCompleted: boolean
+  dateRange?: { start: string; end: string }
+  clientIds?: string[]
+}
+
+export type ProductivityMetrics = {
+  totalCompleted: number
+  averageCompletionTime: number // em dias
+  onTimeRate: number // percentual
+  byResponsible: { name: string; completed: number; onTime: number }[]
+  byMonth: { month: string; completed: number; overdue: number }[]
+  byPriority: { priority: Priority; count: number }[]
 }

@@ -19,9 +19,9 @@ import {
   PlayCircle,
   Eye,
   Filter,
-  Calendar,
   AlertTriangle,
   ArrowUpDown,
+  Clock,
 } from "lucide-react"
 import type { ObligationWithDetails, Client, Tax } from "@/lib/types"
 import { saveObligation, deleteObligation } from "@/lib/storage"
@@ -87,19 +87,20 @@ export function ObligationList({ obligations, clients, taxes, onUpdate }: Obliga
 
   const handleComplete = (obligation: ObligationWithDetails) => {
     const history = obligation.history || []
+    const completedDate = new Date().toISOString()
     const updated = {
       ...obligation,
       status: "completed" as const,
-      completedAt: new Date().toISOString(),
-      realizationDate: new Date().toISOString().split("T")[0],
+      completedAt: completedDate,
+      realizationDate: completedDate.split("T")[0],
       completedBy: "Contador",
       history: [
         ...history,
         {
           id: crypto.randomUUID(),
           action: "completed" as const,
-          description: "Obrigação marcada como concluída",
-          timestamp: new Date().toISOString(),
+          description: `Obrigação concluída em ${formatDate(completedDate.split("T")[0])}`,
+          timestamp: completedDate,
         },
       ],
     }
@@ -163,15 +164,20 @@ export function ObligationList({ obligations, clients, taxes, onUpdate }: Obliga
   const getStatusBadge = (obligation: ObligationWithDetails) => {
     if (obligation.status === "completed") {
       return (
-        <Badge className="bg-green-600 hover:bg-green-700">
-          <CheckCircle2 className="size-3 mr-1" />
-          Concluída
-        </Badge>
+        <div className="flex flex-col gap-1">
+          <Badge className="bg-green-600 hover:bg-green-700 text-white">
+            <CheckCircle2 className="size-3 mr-1" />
+            Concluída
+          </Badge>
+          {obligation.completedAt && (
+            <span className="text-xs text-muted-foreground">{formatDate(obligation.completedAt.split("T")[0])}</span>
+          )}
+        </div>
       )
     }
     if (obligation.status === "in_progress") {
       return (
-        <Badge className="bg-blue-600 hover:bg-blue-700">
+        <Badge className="bg-blue-600 hover:bg-blue-700 text-white">
           <PlayCircle className="size-3 mr-1" />
           Em Andamento
         </Badge>
@@ -179,15 +185,15 @@ export function ObligationList({ obligations, clients, taxes, onUpdate }: Obliga
     }
     if (obligation.status === "overdue" || isOverdue(obligation.calculatedDueDate)) {
       return (
-        <Badge variant="destructive">
+        <Badge variant="destructive" className="bg-red-600 text-white">
           <AlertTriangle className="size-3 mr-1" />
           Atrasada
         </Badge>
       )
     }
     return (
-      <Badge variant="secondary">
-        <Calendar className="size-3 mr-1" />
+      <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+        <Clock className="size-3 mr-1" />
         Pendente
       </Badge>
     )
@@ -291,6 +297,12 @@ export function ObligationList({ obligations, clients, taxes, onUpdate }: Obliga
               </TableHead>
               <TableHead>Imposto</TableHead>
               <TableHead>
+                <Button variant="ghost" size="sm" onClick={() => toggleSort("status")} className="-ml-3">
+                  Status
+                  <ArrowUpDown className="ml-2 size-3" />
+                </Button>
+              </TableHead>
+              <TableHead>
                 <Button variant="ghost" size="sm" onClick={() => toggleSort("dueDate")} className="-ml-3">
                   Vencimento
                   <ArrowUpDown className="ml-2 size-3" />
@@ -303,7 +315,7 @@ export function ObligationList({ obligations, clients, taxes, onUpdate }: Obliga
           <TableBody>
             {sortedObligations.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                   Nenhuma obrigação encontrada
                 </TableCell>
               </TableRow>
@@ -358,6 +370,7 @@ export function ObligationList({ obligations, clients, taxes, onUpdate }: Obliga
                       <span className="text-sm text-muted-foreground">-</span>
                     )}
                   </TableCell>
+                  <TableCell>{getStatusBadge(obligation)}</TableCell>
                   <TableCell>
                     <div className="space-y-1">
                       <div className="font-mono text-sm font-medium">{formatDate(obligation.calculatedDueDate)}</div>

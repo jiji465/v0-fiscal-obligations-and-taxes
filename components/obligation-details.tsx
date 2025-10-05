@@ -1,6 +1,6 @@
 "use client"
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Calendar, Clock, User, FileText, DollarSign, Building2, Receipt } from "lucide-react"
@@ -47,7 +47,11 @@ export function ObligationDetails({ obligation, open, onOpenChange }: Obligation
           <div className="flex items-start justify-between">
             <div>
               <DialogTitle className="text-2xl">{obligation.name}</DialogTitle>
-              {obligation.description && <p className="text-sm text-muted-foreground mt-1">{obligation.description}</p>}
+              {obligation.description && (
+                <DialogDescription className="text-sm text-muted-foreground mt-1">
+                  {obligation.description}
+                </DialogDescription>
+              )}
             </div>
             <Badge className={getStatusColor()}>{getStatusLabel()}</Badge>
           </div>

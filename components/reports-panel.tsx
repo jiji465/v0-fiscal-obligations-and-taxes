@@ -4,26 +4,57 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { CheckCircle2, Clock, AlertTriangle, Calendar } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { CheckCircle2, Clock, AlertTriangle, Calendar, TrendingUp } from "lucide-react"
 import type { ObligationWithDetails } from "@/lib/types"
 import { formatDate, formatCurrency } from "@/lib/date-utils"
 import { getRecurrenceDescription } from "@/lib/recurrence-utils"
+import { useState } from "react"
 
 type ReportsPanelProps = {
   obligations: ObligationWithDetails[]
 }
 
 export function ReportsPanel({ obligations }: ReportsPanelProps) {
-  // Estatísticas gerais
-  const completed = obligations.filter((o) => o.status === "completed")
-  const inProgress = obligations.filter((o) => o.status === "in_progress")
-  const pending = obligations.filter((o) => o.status === "pending")
-  const overdue = obligations.filter((o) => o.status === "overdue")
+  const [periodFilter, setPeriodFilter] = useState<string>("all")
 
-  const completionRate = obligations.length > 0 ? Math.round((completed.length / obligations.length) * 100) : 0
+  const filteredObligations = obligations.filter((obl) => {
+    const oblDate = new Date(obl.calculatedDueDate)
+    const now = new Date()
+
+    switch (periodFilter) {
+      case "this_month":
+        return oblDate.getMonth() === now.getMonth() && oblDate.getFullYear() === now.getFullYear()
+      case "last_month":
+        const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+        return oblDate.getMonth() === lastMonth.getMonth() && oblDate.getFullYear() === lastMonth.getFullYear()
+      case "this_quarter":
+        const quarter = Math.floor(now.getMonth() / 3)
+        const oblQuarter = Math.floor(oblDate.getMonth() / 3)
+        return oblQuarter === quarter && oblDate.getFullYear() === now.getFullYear()
+      case "this_year":
+        return oblDate.getFullYear() === now.getFullYear()
+      default:
+        return true
+    }
+  })
+
+  const completed = filteredObligations.filter((o) => o.status === "completed")
+  const inProgress = filteredObligations.filter((o) => o.status === "in_progress")
+  const pending = filteredObligations.filter((o) => o.status === "pending")
+  const overdue = filteredObligations.filter((o) => o.status === "overdue")
+
+  const completionRate =
+    filteredObligations.length > 0 ? Math.round((completed.length / filteredObligations.length) * 100) : 0
+
+  const completedOnTime = completed.filter((obl) => {
+    if (!obl.realizationDate) return false
+    return new Date(obl.realizationDate) <= new Date(obl.calculatedDueDate)
+  })
+  const onTimeRate = completed.length > 0 ? Math.round((completedOnTime.length / completed.length) * 100) : 0
 
   // Obrigações por cliente
-  const byClient = obligations.reduce(
+  const byClient = filteredObligations.reduce(
     (acc, obl) => {
       const clientName = obl.client.name
       if (!acc[clientName]) {
@@ -39,7 +70,7 @@ export function ReportsPanel({ obligations }: ReportsPanelProps) {
   )
 
   // Obrigações por tipo de recorrência
-  const byRecurrence = obligations.reduce(
+  const byRecurrence = filteredObligations.reduce(
     (acc, obl) => {
       const recurrence = getRecurrenceDescription(obl)
       acc[recurrence] = (acc[recurrence] || 0) + 1
@@ -48,10 +79,42 @@ export function ReportsPanel({ obligations }: ReportsPanelProps) {
     {} as Record<string, number>,
   )
 
+  const byTax = filteredObligations.reduce(
+    (acc, obl) => {
+      const taxName = obl.tax?.name || "Sem imposto"
+      if (!acc[taxName]) {
+        acc[taxName] = { total: 0, completed: 0 }
+      }
+      acc[taxName].total++
+      if (obl.status === "completed") acc[taxName].completed++
+      return acc
+    },
+    {} as Record<string, { total: number; completed: number }>,
+  )
+
   return (
     <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold">Análise de Desempenho</h2>
+          <p className="text-muted-foreground">Métricas e indicadores de produtividade</p>
+        </div>
+        <Select value={periodFilter} onValueChange={setPeriodFilter}>
+          <SelectTrigger className="w-[200px]">
+            <SelectValue placeholder="Período" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os períodos</SelectItem>
+            <SelectItem value="this_month">Este mês</SelectItem>
+            <SelectItem value="last_month">Mês passado</SelectItem>
+            <SelectItem value="this_quarter">Este trimestre</SelectItem>
+            <SelectItem value="this_year">Este ano</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
       {/* Resumo Geral */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -69,6 +132,20 @@ export function ReportsPanel({ obligations }: ReportsPanelProps) {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <TrendingUp className="size-4 text-blue-600" />
+              No Prazo
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{completedOnTime.length}</div>
+            <Progress value={onTimeRate} className="mt-2" />
+            <p className="text-xs text-muted-foreground mt-1">{onTimeRate}% das concluídas</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
               <Clock className="size-4 text-blue-600" />
               Em Andamento
             </CardTitle>
@@ -76,7 +153,7 @@ export function ReportsPanel({ obligations }: ReportsPanelProps) {
           <CardContent>
             <div className="text-2xl font-bold">{inProgress.length}</div>
             <p className="text-xs text-muted-foreground mt-3">
-              {Math.round((inProgress.length / obligations.length) * 100)}% do total
+              {Math.round((inProgress.length / filteredObligations.length) * 100)}% do total
             </p>
           </CardContent>
         </Card>
@@ -112,6 +189,7 @@ export function ReportsPanel({ obligations }: ReportsPanelProps) {
       <Tabs defaultValue="clients" className="space-y-4">
         <TabsList>
           <TabsTrigger value="clients">Por Cliente</TabsTrigger>
+          <TabsTrigger value="tax">Por Imposto</TabsTrigger>
           <TabsTrigger value="recurrence">Por Recorrência</TabsTrigger>
           <TabsTrigger value="completed">Finalizadas</TabsTrigger>
         </TabsList>
@@ -138,6 +216,34 @@ export function ReportsPanel({ obligations }: ReportsPanelProps) {
                     <Progress value={(stats.completed / stats.total) * 100} className="h-2" />
                   </div>
                 ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="tax" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Obrigações por Tipo de Imposto</CardTitle>
+              <CardDescription>Distribuição por categoria fiscal</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {Object.entries(byTax)
+                  .sort(([, a], [, b]) => b.total - a.total)
+                  .map(([tax, stats]) => (
+                    <div key={tax} className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium">{tax}</span>
+                        <span className="text-sm text-muted-foreground">{stats.total} obrigações</span>
+                      </div>
+                      <div className="flex gap-2">
+                        <Badge className="bg-green-600">{stats.completed} concluídas</Badge>
+                        <Badge variant="secondary">{stats.total - stats.completed} pendentes</Badge>
+                      </div>
+                      <Progress value={(stats.completed / stats.total) * 100} className="h-2" />
+                    </div>
+                  ))}
               </div>
             </CardContent>
           </Card>

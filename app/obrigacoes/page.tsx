@@ -3,19 +3,22 @@
 import { useEffect, useState } from "react"
 import { Navigation } from "@/components/navigation"
 import { ObligationList } from "@/components/obligation-list"
+import { GlobalSearch } from "@/components/global-search"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { getClients, getTaxes } from "@/lib/storage"
 import { getObligationsWithDetails } from "@/lib/dashboard-utils"
 import { isOverdue } from "@/lib/date-utils"
-import { CheckCircle2, Clock, PlayCircle, AlertTriangle } from "lucide-react"
+import { CheckCircle2, Clock, PlayCircle, AlertTriangle, Search } from "lucide-react"
 
 export default function ObligacoesPage() {
   const [obligations, setObligations] = useState(getObligationsWithDetails())
   const [clients, setClients] = useState(getClients())
   const [taxes, setTaxes] = useState(getTaxes())
   const [activeTab, setActiveTab] = useState("all")
+  const [searchOpen, setSearchOpen] = useState(false)
 
   const updateData = () => {
     setObligations(getObligationsWithDetails())
@@ -25,6 +28,18 @@ export default function ObligacoesPage() {
 
   useEffect(() => {
     updateData()
+  }, [])
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+        e.preventDefault()
+        setSearchOpen(true)
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
   }, [])
 
   const pendingObligations = obligations.filter((o) => o.status === "pending")
@@ -52,9 +67,18 @@ export default function ObligacoesPage() {
       <Navigation />
       <main className="container mx-auto px-4 py-8">
         <div className="space-y-6">
-          <div className="space-y-2">
-            <h1 className="text-4xl font-bold tracking-tight text-balance">Obrigações Acessórias</h1>
-            <p className="text-lg text-muted-foreground">Gerencie todas as obrigações fiscais dos seus clientes</p>
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-2">
+              <h1 className="text-4xl font-bold tracking-tight text-balance">Obrigações Acessórias</h1>
+              <p className="text-lg text-muted-foreground">Gerencie todas as obrigações fiscais dos seus clientes</p>
+            </div>
+            <Button variant="outline" onClick={() => setSearchOpen(true)} className="gap-2">
+              <Search className="size-4" />
+              Buscar
+              <kbd className="pointer-events-none hidden h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100 sm:flex">
+                <span className="text-xs">⌘</span>K
+              </kbd>
+            </Button>
           </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -125,6 +149,14 @@ export default function ObligacoesPage() {
           </Tabs>
         </div>
       </main>
+
+      <GlobalSearch
+        open={searchOpen}
+        onOpenChange={setSearchOpen}
+        clients={clients}
+        taxes={taxes}
+        obligations={obligations}
+      />
     </div>
   )
 }
