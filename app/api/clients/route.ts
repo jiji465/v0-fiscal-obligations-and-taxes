@@ -1,35 +1,27 @@
 export const runtime = "nodejs"
 import { NextResponse } from "next/server"
+import { sql } from "@vercel/postgres"
+import { ensureSchema } from "@/lib/db"
 
 export async function GET() {
-  const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL}/rest/v1/clients?select=*`
-  const res = await fetch(url, {
-    headers: {
-      apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string,
-      Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
-    },
-    cache: "no-store",
-  })
-  if (!res.ok) return NextResponse.json({ error: await res.text() }, { status: res.status })
-  const data = await res.json()
-  return NextResponse.json(data ?? [])
+  await ensureSchema()
+  const { rows } = await sql`select * from clients order by created_at asc`
+  return NextResponse.json(rows)
 }
 
 export async function POST(req: Request) {
   const body = await req.json()
-  const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL}/rest/v1/clients`
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string,
-      Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
-      "Content-Type": "application/json",
-      Prefer: "resolution=merge-duplicates",
-    },
-    body: JSON.stringify(body),
-    cache: "no-store",
-  })
-  if (!res.ok) return NextResponse.json({ error: await res.text() }, { status: res.status })
+  await ensureSchema()
+  await sql`
+    insert into clients (id, name, cnpj, email, phone, status, created_at)
+    values (${body.id}, ${body.name}, ${body.cnpj}, ${body.email}, ${body.phone}, ${body.status}, ${body.createdAt})
+    on conflict (id) do update set
+      name = excluded.name,
+      cnpj = excluded.cnpj,
+      email = excluded.email,
+      phone = excluded.phone,
+      status = excluded.status
+  `
   return NextResponse.json(body, { status: 201 })
 }
 
