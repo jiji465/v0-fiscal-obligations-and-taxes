@@ -10,7 +10,9 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { getTaxes, saveTax, deleteTax, getClients, getObligations } from "@/lib/storage"
+import { getTaxes, saveTax, deleteTax, getClients, getObligations, saveObligation } from "@/lib/storage"
+import { calculateDueDate } from "@/lib/date-utils"
+import type { WeekendRule } from "@/lib/types"
 import {
   CheckCircle2,
   Clock,
@@ -55,8 +57,39 @@ export default function ImpostosPage() {
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [])
 
-  const handleSave = (tax: Tax) => {
+  const handleSave = (
+    tax: Tax,
+    generate?: { clientId: string; dueMonth?: number; weekendRule: WeekendRule },
+  ) => {
     saveTax(tax)
+
+    if (generate && tax.dueDay) {
+      const now = new Date()
+      const dueMonth = generate.dueMonth ?? now.getMonth() + 1
+      const dueDate = calculateDueDate(tax.dueDay, dueMonth, "monthly", generate.weekendRule)
+
+      const obligation = {
+        id: crypto.randomUUID(),
+        name: tax.name,
+        description: tax.description,
+        category: "tax_guide" as const,
+        clientId: generate.clientId,
+        taxId: tax.id,
+        dueDay: tax.dueDay,
+        dueMonth,
+        frequency: "monthly" as const,
+        recurrence: "monthly" as const,
+        autoGenerate: false,
+        weekendRule: generate.weekendRule,
+        status: "pending" as const,
+        priority: tax.priority,
+        createdAt: new Date().toISOString(),
+        notes: tax.notes,
+      }
+      // salvar
+      saveObligation(obligation as any)
+    }
+
     updateData()
     setEditingTax(undefined)
     setIsFormOpen(false)
@@ -305,7 +338,13 @@ export default function ImpostosPage() {
         </div>
       </main>
 
-      <TaxForm tax={editingTax} open={isFormOpen} onOpenChange={setIsFormOpen} onSave={handleSave} />
+      <TaxForm
+        tax={editingTax}
+        open={isFormOpen}
+        onOpenChange={setIsFormOpen}
+        onSave={handleSave}
+        clients={clients}
+      />
       <GlobalSearch
         open={searchOpen}
         onOpenChange={setSearchOpen}
