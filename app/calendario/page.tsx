@@ -3,15 +3,13 @@
 import { useEffect, useState } from "react"
 import { Navigation } from "@/components/navigation"
 import { CalendarView } from "@/components/calendar-view"
-import { getObligationsWithDetailsAsync } from "@/lib/dashboard-utils"
+import { getObligationsWithDetails } from "@/lib/dashboard-utils"
 
 export default function CalendarioPage() {
-  const [obligations, setObligations] = useState<any[]>([])
+  const [obligations, setObligations] = useState(getObligationsWithDetails())
 
   useEffect(() => {
-    void (async () => {
-      setObligations(await getObligationsWithDetailsAsync())
-    })()
+    setObligations(getObligationsWithDetails())
   }, [])
 
   return (

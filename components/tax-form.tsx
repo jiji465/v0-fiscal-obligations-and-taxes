@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -18,18 +18,16 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog"
-import type { Client, Tax } from "@/lib/types"
-import type { WeekendRule } from "@/lib/types"
+import type { Tax } from "@/lib/types"
 
 type TaxFormProps = {
   tax?: Tax
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSave: (tax: Tax, generate?: { clientId: string; dueMonth?: number; weekendRule: WeekendRule }) => void
-  clients?: Client[]
+  onSave: (tax: Tax) => void
 }
 
-export function TaxForm({ tax, open, onOpenChange, onSave, clients = [] }: TaxFormProps) {
+export function TaxForm({ tax, open, onOpenChange, onSave }: TaxFormProps) {
   const [formData, setFormData] = useState<Partial<Tax>>(
     tax || {
       name: "",
@@ -50,58 +48,6 @@ export function TaxForm({ tax, open, onOpenChange, onSave, clients = [] }: TaxFo
   )
 
   const [newTag, setNewTag] = useState("")
-  const [generateObligation, setGenerateObligation] = useState(false)
-  const [selectedClientId, setSelectedClientId] = useState<string>("")
-  const [dueMonth, setDueMonth] = useState<number>(new Date().getMonth() + 1)
-  const [genWeekendRule, setGenWeekendRule] = useState<WeekendRule>("postpone")
-
-  // Sincroniza formulário quando o imposto a editar mudar/abrir
-  useEffect(() => {
-    if (tax) {
-      setFormData({
-        id: tax.id,
-        name: tax.name,
-        description: tax.description,
-        federalTaxCode: tax.federalTaxCode,
-        dueDay: tax.dueDay,
-        status: tax.status,
-        priority: tax.priority,
-        recurrence: (tax as any).recurrence,
-        recurrenceInterval: (tax as any).recurrenceInterval,
-        recurrenceEndDate: (tax as any).recurrenceEndDate,
-        autoGenerate: (tax as any).autoGenerate ?? false,
-        weekendRule: tax.weekendRule,
-        assignedTo: tax.assignedTo,
-        protocol: tax.protocol,
-        notes: tax.notes,
-        tags: tax.tags || [],
-        completedAt: tax.completedAt,
-        completedBy: tax.completedBy,
-        createdAt: tax.createdAt,
-      })
-      setGenerateObligation(false)
-      setSelectedClientId("")
-    } else {
-      setFormData({
-        name: "",
-        description: "",
-        federalTaxCode: "",
-        dueDay: undefined,
-        status: "pending",
-        priority: "medium",
-        recurrence: "monthly" as any,
-        recurrenceInterval: 1,
-        autoGenerate: false,
-        weekendRule: "postpone",
-        assignedTo: "",
-        protocol: "",
-        notes: "",
-        tags: [],
-      })
-      setGenerateObligation(false)
-      setSelectedClientId("")
-    }
-  }, [tax, open])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -126,10 +72,7 @@ export function TaxForm({ tax, open, onOpenChange, onSave, clients = [] }: TaxFo
       completedBy: formData.completedBy,
       createdAt: tax?.createdAt || new Date().toISOString(),
     }
-    const generate = generateObligation && selectedClientId
-      ? { clientId: selectedClientId, dueMonth, weekendRule: genWeekendRule }
-      : undefined
-    onSave(taxData, generate)
+    onSave(taxData)
     onOpenChange(false)
   }
 
@@ -357,72 +300,6 @@ export function TaxForm({ tax, open, onOpenChange, onSave, clients = [] }: TaxFo
                     Dia padrão de vencimento (pode ser sobrescrito na obrigação)
                   </p>
                 </div>
-
-          {/* Gerar obrigação */}
-          <div className="space-y-4 border-t pt-4">
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Gerar obrigação</h3>
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label htmlFor="generateObligation">Gerar uma obrigação agora</Label>
-                <p className="text-xs text-muted-foreground">Cria uma obrigação associada a um cliente</p>
-              </div>
-              <Switch
-                id="generateObligation"
-                checked={generateObligation}
-                onCheckedChange={setGenerateObligation}
-              />
-            </div>
-
-            {generateObligation && (
-              <div className="grid sm:grid-cols-3 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="clientId">Cliente</Label>
-                  <Select value={selectedClientId} onValueChange={setSelectedClientId}>
-                    <SelectTrigger id="clientId">
-                      <SelectValue placeholder="Selecione um cliente" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {clients.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="grid gap-2">
-                  <Label htmlFor="dueMonth">Mês de referência</Label>
-                  <Select value={String(dueMonth)} onValueChange={(v) => setDueMonth(Number(v))}>
-                    <SelectTrigger id="dueMonth">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {[1,2,3,4,5,6,7,8,9,10,11,12].map((m) => (
-                        <SelectItem key={m} value={String(m)}>
-                          {m.toString().padStart(2, "0")}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="grid gap-2">
-                  <Label htmlFor="genWeekendRule">Regra FDS</Label>
-                  <Select value={genWeekendRule} onValueChange={(v) => setGenWeekendRule(v as WeekendRule)}>
-                    <SelectTrigger id="genWeekendRule">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="postpone">Postergar</SelectItem>
-                      <SelectItem value="anticipate">Antecipar</SelectItem>
-                      <SelectItem value="keep">Manter</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            )}
-          </div>
 
                 <div className="grid gap-2">
                   <Label htmlFor="weekendRule">Regra de Final de Semana *</Label>

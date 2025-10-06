@@ -10,16 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import {
-  getTaxesAsync,
-  saveTaxAsync,
-  deleteTaxAsync,
-  getClientsAsync,
-  getObligationsAsync,
-  saveObligationAsync,
-} from "@/lib/storage"
-import { calculateDueDate } from "@/lib/date-utils"
-import type { WeekendRule } from "@/lib/types"
+import { getTaxes, saveTax, deleteTax, getClients, getObligations } from "@/lib/storage"
 import {
   CheckCircle2,
   Clock,
@@ -34,23 +25,22 @@ import {
 import type { Tax } from "@/lib/types"
 
 export default function ImpostosPage() {
-  const [taxes, setTaxes] = useState<any[]>([])
-  const [clients, setClients] = useState<any[]>([])
-  const [obligations, setObligations] = useState<any[]>([])
+  const [taxes, setTaxes] = useState(getTaxes())
+  const [clients, setClients] = useState(getClients())
+  const [obligations, setObligations] = useState(getObligations())
   const [editingTax, setEditingTax] = useState<Tax | undefined>()
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("all")
   const [searchOpen, setSearchOpen] = useState(false)
 
-  const updateData = async () => {
-    const [t, c, o] = await Promise.all([getTaxesAsync(), getClientsAsync(), getObligationsAsync()])
-    setTaxes(t)
-    setClients(c)
-    setObligations(o)
+  const updateData = () => {
+    setTaxes(getTaxes())
+    setClients(getClients())
+    setObligations(getObligations())
   }
 
   useEffect(() => {
-    void updateData()
+    updateData()
   }, [])
 
   useEffect(() => {
@@ -65,53 +55,17 @@ export default function ImpostosPage() {
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [])
 
-  const handleSave = (
-    tax: Tax,
-    generate?: { clientId: string; dueMonth?: number; weekendRule: WeekendRule },
-  ) => {
-    void (async () => {
-      await saveTaxAsync(tax)
-
-      if (generate && tax.dueDay) {
-        const now = new Date()
-        const dueMonth = generate.dueMonth ?? now.getMonth() + 1
-        const dueDate = calculateDueDate(tax.dueDay, dueMonth, "monthly", generate.weekendRule)
-
-        const obligation = {
-          id: crypto.randomUUID(),
-          name: tax.name,
-          description: tax.description,
-          category: "tax_guide" as const,
-          clientId: generate.clientId,
-          taxId: tax.id,
-          dueDay: tax.dueDay,
-          dueMonth,
-          frequency: "monthly" as const,
-          recurrence: "monthly" as const,
-          autoGenerate: false,
-          weekendRule: generate.weekendRule,
-          status: "pending" as const,
-          priority: tax.priority,
-          createdAt: new Date().toISOString(),
-          notes: tax.notes,
-        }
-        await saveObligationAsync(obligation as any)
-        // aguardar consistência eventual
-        await new Promise((r) => setTimeout(r, 200))
-      }
-
-      await updateData()
-      setEditingTax(undefined)
-      setIsFormOpen(false)
-    })()
+  const handleSave = (tax: Tax) => {
+    saveTax(tax)
+    updateData()
+    setEditingTax(undefined)
+    setIsFormOpen(false)
   }
 
   const handleDelete = (id: string) => {
     if (confirm("Tem certeza que deseja excluir este imposto?")) {
-      void (async () => {
-        await deleteTaxAsync(id)
-        await updateData()
-      })()
+      deleteTax(id)
+      updateData()
     }
   }
 
@@ -127,10 +81,8 @@ export default function ImpostosPage() {
 
   const handleStartTax = (tax: Tax) => {
     const updatedTax = { ...tax, status: "in_progress" as const }
-    void (async () => {
-      await saveTaxAsync(updatedTax)
-      await updateData()
-    })()
+    saveTax(updatedTax)
+    updateData()
   }
 
   const handleCompleteTax = (tax: Tax) => {
@@ -139,10 +91,8 @@ export default function ImpostosPage() {
       status: "completed" as const,
       completedAt: new Date().toISOString(),
     }
-    void (async () => {
-      await saveTaxAsync(updatedTax)
-      await updateData()
-    })()
+    saveTax(updatedTax)
+    updateData()
   }
   // </CHANGE>
 
@@ -355,13 +305,7 @@ export default function ImpostosPage() {
         </div>
       </main>
 
-      <TaxForm
-        tax={editingTax}
-        open={isFormOpen}
-        onOpenChange={setIsFormOpen}
-        onSave={handleSave}
-        clients={clients}
-      />
+      <TaxForm tax={editingTax} open={isFormOpen} onOpenChange={setIsFormOpen} onSave={handleSave} />
       <GlobalSearch
         open={searchOpen}
         onOpenChange={setSearchOpen}

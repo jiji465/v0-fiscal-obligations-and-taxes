@@ -19,11 +19,6 @@ export const metadata: Metadata = {
   title: "Sistema Fiscal - Controle de Obrigações",
   description: "Sistema de controle de obrigações acessórias e impostos para contabilidade",
   generator: "v0.app",
-  icons: {
-    icon: [
-      { url: "/favicon.svg", type: "image/svg+xml" },
-    ],
-  },
 }
 
 export default function RootLayout({
