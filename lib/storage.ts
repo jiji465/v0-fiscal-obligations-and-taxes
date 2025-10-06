@@ -1,13 +1,18 @@
 import type { Client, Tax, Obligation } from "./types"
+import { fetchWithRetry } from "./http"
 
 const USE_KV = typeof process !== "undefined" && process.env.NEXT_PUBLIC_USE_KV === "1"
 
 async function api<T>(path: string, method: string, body?: unknown): Promise<T> {
-  const res = await fetch(path, {
-    method,
-    headers: { "Content-Type": "application/json" },
-    body: body ? JSON.stringify(body) : undefined,
-  })
+  const res = await fetchWithRetry(
+    path,
+    {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: body ? JSON.stringify(body) : undefined,
+    },
+    { retries: 3, backoffMs: 300, timeoutMs: 8000 },
+  )
   if (!res.ok) throw new Error(`API ${path} ${res.status}`)
   return (await res.json()) as T
 }

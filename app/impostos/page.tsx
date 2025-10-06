@@ -96,6 +96,8 @@ export default function ImpostosPage() {
           notes: tax.notes,
         }
         await saveObligationAsync(obligation as any)
+        // aguardar consistência eventual
+        await new Promise((r) => setTimeout(r, 200))
       }
 
       await updateData()
