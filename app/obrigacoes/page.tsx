@@ -8,26 +8,31 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { getClients, getTaxes } from "@/lib/storage"
-import { getObligationsWithDetails } from "@/lib/dashboard-utils"
+import { getClientsAsync, getTaxesAsync } from "@/lib/storage"
+import { getObligationsWithDetailsAsync } from "@/lib/dashboard-utils"
 import { isOverdue } from "@/lib/date-utils"
 import { CheckCircle2, Clock, PlayCircle, AlertTriangle, Search } from "lucide-react"
 
 export default function ObligacoesPage() {
-  const [obligations, setObligations] = useState(getObligationsWithDetails())
-  const [clients, setClients] = useState(getClients())
-  const [taxes, setTaxes] = useState(getTaxes())
+  const [obligations, setObligations] = useState<any[]>([])
+  const [clients, setClients] = useState<any[]>([])
+  const [taxes, setTaxes] = useState<any[]>([])
   const [activeTab, setActiveTab] = useState("all")
   const [searchOpen, setSearchOpen] = useState(false)
 
-  const updateData = () => {
-    setObligations(getObligationsWithDetails())
-    setClients(getClients())
-    setTaxes(getTaxes())
+  const updateData = async () => {
+    const [o, c, t] = await Promise.all([
+      getObligationsWithDetailsAsync(),
+      getClientsAsync(),
+      getTaxesAsync(),
+    ])
+    setObligations(o)
+    setClients(c)
+    setTaxes(t)
   }
 
   useEffect(() => {
-    updateData()
+    void updateData()
   }, [])
 
   useEffect(() => {

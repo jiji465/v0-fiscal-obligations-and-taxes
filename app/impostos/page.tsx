@@ -10,7 +10,14 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { getTaxes, saveTax, deleteTax, getClients, getObligations, saveObligation } from "@/lib/storage"
+import {
+  getTaxesAsync,
+  saveTaxAsync,
+  deleteTaxAsync,
+  getClientsAsync,
+  getObligationsAsync,
+  saveObligationAsync,
+} from "@/lib/storage"
 import { calculateDueDate } from "@/lib/date-utils"
 import type { WeekendRule } from "@/lib/types"
 import {
@@ -27,22 +34,23 @@ import {
 import type { Tax } from "@/lib/types"
 
 export default function ImpostosPage() {
-  const [taxes, setTaxes] = useState(getTaxes())
-  const [clients, setClients] = useState(getClients())
-  const [obligations, setObligations] = useState(getObligations())
+  const [taxes, setTaxes] = useState<any[]>([])
+  const [clients, setClients] = useState<any[]>([])
+  const [obligations, setObligations] = useState<any[]>([])
   const [editingTax, setEditingTax] = useState<Tax | undefined>()
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("all")
   const [searchOpen, setSearchOpen] = useState(false)
 
-  const updateData = () => {
-    setTaxes(getTaxes())
-    setClients(getClients())
-    setObligations(getObligations())
+  const updateData = async () => {
+    const [t, c, o] = await Promise.all([getTaxesAsync(), getClientsAsync(), getObligationsAsync()])
+    setTaxes(t)
+    setClients(c)
+    setObligations(o)
   }
 
   useEffect(() => {
-    updateData()
+    void updateData()
   }, [])
 
   useEffect(() => {
@@ -61,44 +69,47 @@ export default function ImpostosPage() {
     tax: Tax,
     generate?: { clientId: string; dueMonth?: number; weekendRule: WeekendRule },
   ) => {
-    saveTax(tax)
+    void (async () => {
+      await saveTaxAsync(tax)
 
-    if (generate && tax.dueDay) {
-      const now = new Date()
-      const dueMonth = generate.dueMonth ?? now.getMonth() + 1
-      const dueDate = calculateDueDate(tax.dueDay, dueMonth, "monthly", generate.weekendRule)
+      if (generate && tax.dueDay) {
+        const now = new Date()
+        const dueMonth = generate.dueMonth ?? now.getMonth() + 1
+        const dueDate = calculateDueDate(tax.dueDay, dueMonth, "monthly", generate.weekendRule)
 
-      const obligation = {
-        id: crypto.randomUUID(),
-        name: tax.name,
-        description: tax.description,
-        category: "tax_guide" as const,
-        clientId: generate.clientId,
-        taxId: tax.id,
-        dueDay: tax.dueDay,
-        dueMonth,
-        frequency: "monthly" as const,
-        recurrence: "monthly" as const,
-        autoGenerate: false,
-        weekendRule: generate.weekendRule,
-        status: "pending" as const,
-        priority: tax.priority,
-        createdAt: new Date().toISOString(),
-        notes: tax.notes,
+        const obligation = {
+          id: crypto.randomUUID(),
+          name: tax.name,
+          description: tax.description,
+          category: "tax_guide" as const,
+          clientId: generate.clientId,
+          taxId: tax.id,
+          dueDay: tax.dueDay,
+          dueMonth,
+          frequency: "monthly" as const,
+          recurrence: "monthly" as const,
+          autoGenerate: false,
+          weekendRule: generate.weekendRule,
+          status: "pending" as const,
+          priority: tax.priority,
+          createdAt: new Date().toISOString(),
+          notes: tax.notes,
+        }
+        await saveObligationAsync(obligation as any)
       }
-      // salvar
-      saveObligation(obligation as any)
-    }
 
-    updateData()
-    setEditingTax(undefined)
-    setIsFormOpen(false)
+      await updateData()
+      setEditingTax(undefined)
+      setIsFormOpen(false)
+    })()
   }
 
   const handleDelete = (id: string) => {
     if (confirm("Tem certeza que deseja excluir este imposto?")) {
-      deleteTax(id)
-      updateData()
+      void (async () => {
+        await deleteTaxAsync(id)
+        await updateData()
+      })()
     }
   }
 
@@ -114,8 +125,10 @@ export default function ImpostosPage() {
 
   const handleStartTax = (tax: Tax) => {
     const updatedTax = { ...tax, status: "in_progress" as const }
-    saveTax(updatedTax)
-    updateData()
+    void (async () => {
+      await saveTaxAsync(updatedTax)
+      await updateData()
+    })()
   }
 
   const handleCompleteTax = (tax: Tax) => {
@@ -124,8 +137,10 @@ export default function ImpostosPage() {
       status: "completed" as const,
       completedAt: new Date().toISOString(),
     }
-    saveTax(updatedTax)
-    updateData()
+    void (async () => {
+      await saveTaxAsync(updatedTax)
+      await updateData()
+    })()
   }
   // </CHANGE>
 

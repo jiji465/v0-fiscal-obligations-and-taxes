@@ -8,27 +8,40 @@ import { UpcomingObligations } from "@/components/upcoming-obligations"
 import { ClientOverview } from "@/components/client-overview"
 import { TaxCalendar } from "@/components/tax-calendar"
 import { QuickActions } from "@/components/quick-actions"
-import { getClients, getTaxes } from "@/lib/storage"
-import { getObligationsWithDetails, calculateDashboardStats } from "@/lib/dashboard-utils"
+import { getClientsAsync, getTaxesAsync } from "@/lib/storage"
+import { getObligationsWithDetailsAsync, calculateDashboardStatsFrom } from "@/lib/dashboard-utils"
 import { TrendingUp, CalendarIcon, AlertCircle } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 
 export default function DashboardPage() {
-  const [stats, setStats] = useState(calculateDashboardStats())
-  const [obligations, setObligations] = useState(getObligationsWithDetails())
-  const [clients, setClients] = useState(getClients())
-  const [taxes, setTaxes] = useState(getTaxes())
+  const [stats, setStats] = useState(() => ({
+    totalClients: 0,
+    activeClients: 0,
+    totalObligations: 0,
+    pendingObligations: 0,
+    completedThisMonth: 0,
+    overdueObligations: 0,
+    upcomingThisWeek: 0,
+  }))
+  const [obligations, setObligations] = useState<any[]>([])
+  const [clients, setClients] = useState<any[]>([])
+  const [taxes, setTaxes] = useState<any[]>([])
 
-  const updateData = () => {
-    setStats(calculateDashboardStats())
-    setObligations(getObligationsWithDetails())
-    setClients(getClients())
-    setTaxes(getTaxes())
+  const updateData = async () => {
+    const [o, c, t] = await Promise.all([
+      getObligationsWithDetailsAsync(),
+      getClientsAsync(),
+      getTaxesAsync(),
+    ])
+    setObligations(o)
+    setClients(c)
+    setTaxes(t)
+    setStats(calculateDashboardStatsFrom(c, o))
   }
 
   useEffect(() => {
-    updateData()
+    void updateData()
   }, [])
 
   const criticalAlerts = obligations.filter(

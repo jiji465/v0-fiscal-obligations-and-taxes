@@ -1,20 +1,16 @@
 import { NextResponse } from "next/server"
-import kv from "@/lib/kv"
-
-const KEY = "fiscal:obligations"
+import { supabase } from "@/lib/supabase"
 
 export async function GET() {
-  const items = (await kv.get(KEY)) as any[] | null
-  return NextResponse.json(items || [])
+  const { data, error } = await supabase.from("obligations").select("*").order("created_at", { ascending: true })
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json(data ?? [])
 }
 
 export async function POST(req: Request) {
   const body = await req.json()
-  const items = ((await kv.get(KEY)) as any[] | null) || []
-  const existingIndex = items.findIndex((t) => t.id === body.id)
-  if (existingIndex >= 0) items[existingIndex] = body
-  else items.push(body)
-  await kv.set(KEY, items)
+  const { error } = await supabase.from("obligations").upsert(body, { onConflict: "id" })
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json(body, { status: 201 })
 }
 
