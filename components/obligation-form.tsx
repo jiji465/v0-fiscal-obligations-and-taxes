@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -54,6 +54,61 @@ export function ObligationForm({ obligation, clients, taxes, open, onOpenChange,
   )
 
   const [newTag, setNewTag] = useState("")
+
+  // Sincroniza formulário ao abrir/editar
+  useEffect(() => {
+    if (obligation) {
+      setFormData({
+        id: obligation.id,
+        name: obligation.name,
+        description: obligation.description,
+        clientId: obligation.clientId,
+        taxId: obligation.taxId,
+        dueDay: obligation.dueDay,
+        dueMonth: obligation.dueMonth,
+        frequency: obligation.frequency,
+        recurrence: obligation.recurrence,
+        recurrenceInterval: obligation.recurrenceInterval,
+        recurrenceEndDate: obligation.recurrenceEndDate,
+        autoGenerate: obligation.autoGenerate,
+        weekendRule: obligation.weekendRule,
+        status: obligation.status,
+        priority: obligation.priority,
+        assignedTo: obligation.assignedTo,
+        protocol: obligation.protocol,
+        realizationDate: obligation.realizationDate,
+        amount: obligation.amount,
+        notes: obligation.notes,
+        createdAt: obligation.createdAt,
+        completedAt: obligation.completedAt,
+        completedBy: obligation.completedBy,
+        attachments: obligation.attachments,
+        parentObligationId: obligation.parentObligationId,
+        generatedFor: obligation.generatedFor,
+        tags: obligation.tags || [],
+      })
+    } else {
+      setFormData({
+        name: "",
+        description: "",
+        clientId: "",
+        taxId: "",
+        dueDay: 10,
+        frequency: "monthly",
+        recurrence: "monthly",
+        recurrenceInterval: 1,
+        autoGenerate: false,
+        weekendRule: "postpone",
+        status: "pending",
+        priority: "medium",
+        assignedTo: "",
+        protocol: "",
+        amount: 0,
+        notes: "",
+        tags: [],
+      })
+    }
+  }, [obligation, open])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()

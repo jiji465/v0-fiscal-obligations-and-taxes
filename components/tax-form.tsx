@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -54,6 +54,54 @@ export function TaxForm({ tax, open, onOpenChange, onSave, clients = [] }: TaxFo
   const [selectedClientId, setSelectedClientId] = useState<string>("")
   const [dueMonth, setDueMonth] = useState<number>(new Date().getMonth() + 1)
   const [genWeekendRule, setGenWeekendRule] = useState<WeekendRule>("postpone")
+
+  // Sincroniza formulário quando o imposto a editar mudar/abrir
+  useEffect(() => {
+    if (tax) {
+      setFormData({
+        id: tax.id,
+        name: tax.name,
+        description: tax.description,
+        federalTaxCode: tax.federalTaxCode,
+        dueDay: tax.dueDay,
+        status: tax.status,
+        priority: tax.priority,
+        recurrence: (tax as any).recurrence,
+        recurrenceInterval: (tax as any).recurrenceInterval,
+        recurrenceEndDate: (tax as any).recurrenceEndDate,
+        autoGenerate: (tax as any).autoGenerate ?? false,
+        weekendRule: tax.weekendRule,
+        assignedTo: tax.assignedTo,
+        protocol: tax.protocol,
+        notes: tax.notes,
+        tags: tax.tags || [],
+        completedAt: tax.completedAt,
+        completedBy: tax.completedBy,
+        createdAt: tax.createdAt,
+      })
+      setGenerateObligation(false)
+      setSelectedClientId("")
+    } else {
+      setFormData({
+        name: "",
+        description: "",
+        federalTaxCode: "",
+        dueDay: undefined,
+        status: "pending",
+        priority: "medium",
+        recurrence: "monthly" as any,
+        recurrenceInterval: 1,
+        autoGenerate: false,
+        weekendRule: "postpone",
+        assignedTo: "",
+        protocol: "",
+        notes: "",
+        tags: [],
+      })
+      setGenerateObligation(false)
+      setSelectedClientId("")
+    }
+  }, [tax, open])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
