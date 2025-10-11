@@ -12,18 +12,34 @@ import { getClients, getTaxes } from "@/lib/storage"
 import { getObligationsWithDetails } from "@/lib/dashboard-utils"
 import { isOverdue } from "@/lib/date-utils"
 import { CheckCircle2, Clock, PlayCircle, AlertTriangle, Search } from "lucide-react"
+import type { ObligationWithDetails, Client, Tax } from "@/lib/types"
 
 export default function ObligacoesPage() {
-  const [obligations, setObligations] = useState(getObligationsWithDetails())
-  const [clients, setClients] = useState(getClients())
-  const [taxes, setTaxes] = useState(getTaxes())
+  const [obligations, setObligations] = useState<ObligationWithDetails[]>([])
+  const [clients, setClients] = useState<Client[]>([])
+  const [taxes, setTaxes] = useState<Tax[]>([])
   const [activeTab, setActiveTab] = useState("all")
   const [searchOpen, setSearchOpen] = useState(false)
+  const [loading, setLoading] = useState(true)
 
-  const updateData = () => {
-    setObligations(getObligationsWithDetails())
-    setClients(getClients())
-    setTaxes(getTaxes())
+  const updateData = async () => {
+    try {
+      const [obligationsData, clientsData, taxesData] = await Promise.all([
+        getObligationsWithDetails(),
+        getClients(),
+        getTaxes()
+      ])
+      setObligations(obligationsData)
+      setClients(clientsData)
+      setTaxes(taxesData)
+    } catch (error) {
+      console.error('Erro ao carregar dados:', error)
+      setObligations([])
+      setClients([])
+      setTaxes([])
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {
@@ -60,6 +76,22 @@ export default function ObligacoesPage() {
       default:
         return obligations
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navigation />
+        <main className="container mx-auto px-4 py-8">
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+              <p>Carregando obrigações...</p>
+            </div>
+          </div>
+        </main>
+      </div>
+    )
   }
 
   return (
