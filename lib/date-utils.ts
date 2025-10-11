@@ -81,3 +81,13 @@ export const isUpcomingThisWeek = (dueDate: string): boolean => {
   weekFromNow.setDate(today.getDate() + 7)
   return due >= today && due <= weekFromNow
 }
+
+export const calculateNextDueDate = (
+  dueDay: number,
+  dueMonth: number | undefined,
+  frequency: string,
+  weekendRule: WeekendRule,
+  referenceDate: Date = new Date(),
+): Date => {
+  return calculateDueDate(dueDay, dueMonth, frequency, weekendRule, referenceDate)
+}

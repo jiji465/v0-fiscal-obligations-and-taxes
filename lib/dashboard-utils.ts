@@ -1,5 +1,6 @@
 import type { DashboardStats, ObligationWithDetails, Client, Obligation } from "./types"
 import { calculateDueDate, isOverdue, isUpcomingThisWeek } from "./date-utils"
+import { getObligations } from "./supabase-service"
 
 export const calculateDashboardStats = (obligations: ObligationWithDetails[], clients: Client[]): DashboardStats => {
   const activeClients = clients.filter((c) => c.status === "active").length
@@ -26,5 +27,29 @@ export const calculateDashboardStats = (obligations: ObligationWithDetails[], cl
     completedThisMonth,
     overdueObligations: overdueObligations.length,
     upcomingThisWeek: upcomingThisWeek.length,
+  }
+}
+
+export const getObligationsWithDetails = async (): Promise<ObligationWithDetails[]> => {
+  try {
+    const obligations = await getObligations()
+    
+    return obligations.map(obligation => ({
+      ...obligation,
+      client: {
+        id: obligation.clientId,
+        name: 'Cliente',
+        cnpj: '00.000.000/0000-00',
+        email: '',
+        phone: '',
+        taxRegime: 'simples_nacional',
+        status: 'active',
+        createdAt: new Date().toISOString()
+      },
+      calculatedDueDate: new Date().toISOString().split('T')[0]
+    }))
+  } catch (error) {
+    console.error('Erro ao buscar obrigações:', error)
+    return []
   }
 }
