@@ -7,18 +7,38 @@ import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ChevronLeft, ChevronRight, CalendarIcon, Filter } from "lucide-react"
-import type { ObligationWithDetails } from "@/lib/types"
-import { formatDate } from "@/lib/date-utils"
+import type { ObligationWithDetails, Tax, Installment, Client } from "@/lib/types"
+import { formatDate, calculateDueDate } from "@/lib/date-utils"
+
+export type CalendarItem = {
+  id: string
+  name: string
+  type: 'obligation' | 'tax' | 'installment'
+  dueDate: string
+  status: 'pending' | 'in_progress' | 'completed' | 'overdue'
+  priority: 'low' | 'medium' | 'high' | 'urgent'
+  client: Client
+  description?: string
+  amount?: number
+  installmentInfo?: {
+    installmentNumber: number
+    totalInstallments: number
+  }
+}
 
 type CalendarViewProps = {
   obligations: ObligationWithDetails[]
+  taxes?: Tax[]
+  installments?: Installment[]
+  clients: Client[]
 }
 
-export function CalendarView({ obligations }: CalendarViewProps) {
+export function CalendarView({ obligations, taxes = [], installments = [], clients }: CalendarViewProps) {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [selectedDay, setSelectedDay] = useState<number | null>(null)
   const [filterClient, setFilterClient] = useState<string>("all")
   const [filterStatus, setFilterStatus] = useState<string>("all")
+  const [filterType, setFilterType] = useState<string>("all")
 
   const year = currentDate.getFullYear()
   const month = currentDate.getMonth()
@@ -28,7 +48,63 @@ export function CalendarView({ obligations }: CalendarViewProps) {
   const daysInMonth = lastDay.getDate()
   const startingDayOfWeek = firstDay.getDay()
 
-  const uniqueClients = Array.from(new Set(obligations.map((o) => o.client.name))).sort()
+  // Converter todos os tipos para CalendarItem
+  const calendarItems: CalendarItem[] = [
+    // Obrigações
+    ...obligations.map(obl => ({
+      id: obl.id,
+      name: obl.name,
+      type: 'obligation' as const,
+      dueDate: obl.calculatedDueDate,
+      status: obl.status,
+      priority: obl.priority,
+      client: obl.client,
+      description: obl.description,
+      amount: obl.amount
+    })),
+    // Impostos
+    ...taxes.map(tax => {
+      const client = clients.find(c => c.id === tax.clientId)
+      if (!client) return null
+      
+      const dueDate = calculateDueDate(tax.dueDay, tax.dueMonth, undefined, tax.weekendRule)
+      
+      return {
+        id: tax.id,
+        name: tax.name,
+        type: 'tax' as const,
+        dueDate: dueDate.toISOString().split('T')[0],
+        status: tax.status,
+        priority: tax.priority,
+        client,
+        description: tax.description,
+        amount: tax.amount
+      }
+    }).filter(Boolean) as CalendarItem[],
+    // Parcelamentos
+    ...installments.map(inst => {
+      const client = clients.find(c => c.id === inst.clientId)
+      if (!client) return null
+      
+      return {
+        id: inst.id,
+        name: inst.description,
+        type: 'installment' as const,
+        dueDate: inst.dueDate,
+        status: inst.status,
+        priority: 'medium' as const,
+        client,
+        description: inst.description,
+        amount: inst.amount,
+        installmentInfo: {
+          installmentNumber: inst.installmentNumber,
+          totalInstallments: inst.totalInstallments
+        }
+      }
+    }).filter(Boolean) as CalendarItem[]
+  ]
+
+  const uniqueClients = Array.from(new Set(calendarItems.map((item) => item.client.name))).sort()
 
   const previousMonth = () => {
     setCurrentDate(new Date(year, month - 1, 1))
@@ -42,14 +118,15 @@ export function CalendarView({ obligations }: CalendarViewProps) {
     setCurrentDate(new Date())
   }
 
-  const getObligationsForDay = (day: number) => {
+  const getItemsForDay = (day: number) => {
     const dateStr = new Date(year, month, day).toISOString().split("T")[0]
-    return obligations.filter((obl) => {
-      const oblDate = new Date(obl.calculatedDueDate).toISOString().split("T")[0]
-      const matchesDate = oblDate === dateStr
-      const matchesClient = filterClient === "all" || obl.client.name === filterClient
-      const matchesStatus = filterStatus === "all" || obl.status === filterStatus
-      return matchesDate && matchesClient && matchesStatus
+    return calendarItems.filter((item) => {
+      const itemDate = new Date(item.dueDate).toISOString().split("T")[0]
+      const matchesDate = itemDate === dateStr
+      const matchesClient = filterClient === "all" || item.client.name === filterClient
+      const matchesStatus = filterStatus === "all" || item.status === filterStatus
+      const matchesType = filterType === "all" || item.type === filterType
+      return matchesDate && matchesClient && matchesStatus && matchesType
     })
   }
 
@@ -78,18 +155,31 @@ export function CalendarView({ obligations }: CalendarViewProps) {
     calendarDays.push(day)
   }
 
-  const selectedDayObligations = selectedDay ? getObligationsForDay(selectedDay) : []
+  const selectedDayItems = selectedDay ? getItemsForDay(selectedDay) : []
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "completed":
-        return "bg-green-500/20 text-green-700 dark:text-green-300 border-green-500/30"
-      case "in_progress":
+  const getTypeColor = (type: string) => {
+    switch (type) {
+      case "tax":
+        return "bg-orange-500/20 text-orange-700 dark:text-orange-300 border-orange-500/30"
+      case "obligation":
         return "bg-blue-500/20 text-blue-700 dark:text-blue-300 border-blue-500/30"
-      case "overdue":
-        return "bg-red-500/20 text-red-700 dark:text-red-300 border-red-500/30"
+      case "installment":
+        return "bg-purple-500/20 text-purple-700 dark:text-purple-300 border-purple-500/30"
       default:
-        return "bg-yellow-500/20 text-yellow-700 dark:text-yellow-300 border-yellow-500/30"
+        return "bg-gray-500/20 text-gray-700 dark:text-gray-300 border-gray-500/30"
+    }
+  }
+
+  const getTypeIcon = (type: string) => {
+    switch (type) {
+      case "tax":
+        return "💰"
+      case "obligation":
+        return "📄"
+      case "installment":
+        return "📊"
+      default:
+        return "📋"
     }
   }
 
@@ -100,7 +190,7 @@ export function CalendarView({ obligations }: CalendarViewProps) {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>Calendário de Vencimentos</CardTitle>
-              <CardDescription>Visualize as obrigações por data com filtros personalizados</CardDescription>
+              <CardDescription>Visualize impostos, obrigações e parcelamentos por data</CardDescription>
             </div>
             <CalendarIcon className="size-5 text-muted-foreground" />
           </div>
@@ -151,6 +241,18 @@ export function CalendarView({ obligations }: CalendarViewProps) {
                     <SelectItem value="overdue">Atrasada</SelectItem>
                   </SelectContent>
                 </Select>
+
+                <Select value={filterType} onValueChange={setFilterType}>
+                  <SelectTrigger className="w-[150px]">
+                    <SelectValue placeholder="Tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os tipos</SelectItem>
+                    <SelectItem value="tax">💰 Impostos</SelectItem>
+                    <SelectItem value="obligation">📄 Obrigações</SelectItem>
+                    <SelectItem value="installment">📊 Parcelamentos</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
@@ -166,7 +268,7 @@ export function CalendarView({ obligations }: CalendarViewProps) {
                   return <div key={`empty-${index}`} className="aspect-square" />
                 }
 
-                const dayObligations = getObligationsForDay(day)
+                const dayItems = getItemsForDay(day)
                 const isToday =
                   day === new Date().getDate() && month === new Date().getMonth() && year === new Date().getFullYear()
                 const isWeekend = new Date(year, month, day).getDay() === 0 || new Date(year, month, day).getDay() === 6
@@ -177,22 +279,22 @@ export function CalendarView({ obligations }: CalendarViewProps) {
                     onClick={() => setSelectedDay(day)}
                     className={`aspect-square border rounded-lg p-1 flex flex-col hover:bg-accent transition-colors ${
                       isToday ? "border-primary bg-primary/5 ring-2 ring-primary/20" : ""
-                    } ${isWeekend ? "bg-muted/30" : ""} ${dayObligations.length > 0 ? "cursor-pointer" : ""}`}
+                    } ${isWeekend ? "bg-muted/30" : ""} ${dayItems.length > 0 ? "cursor-pointer" : ""}`}
                   >
                     <div className={`text-sm font-medium ${isToday ? "text-primary font-bold" : ""}`}>{day}</div>
                     <div className="flex-1 flex flex-col gap-0.5 mt-1 overflow-hidden">
-                      {dayObligations.slice(0, 3).map((obl) => (
+                      {dayItems.slice(0, 3).map((item) => (
                         <div
-                          key={obl.id}
-                          className={`text-[10px] px-1 py-0.5 rounded truncate border ${getStatusColor(obl.status)}`}
-                          title={`${obl.name} - ${obl.client.name}`}
+                          key={item.id}
+                          className={`text-[10px] px-1 py-0.5 rounded truncate border ${getTypeColor(item.type)}`}
+                          title={`${getTypeIcon(item.type)} ${item.name} - ${item.client.name}`}
                         >
-                          {obl.name}
+                          {getTypeIcon(item.type)} {item.name}
                         </div>
                       ))}
-                      {dayObligations.length > 3 && (
+                      {dayItems.length > 3 && (
                         <div className="text-[10px] text-muted-foreground font-medium">
-                          +{dayObligations.length - 3} mais
+                          +{dayItems.length - 3} mais
                         </div>
                       )}
                     </div>
@@ -203,7 +305,7 @@ export function CalendarView({ obligations }: CalendarViewProps) {
 
             <div className="pt-4 border-t">
               <h4 className="text-sm font-medium mb-3">Legenda</h4>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
                 <div className="flex items-center gap-2">
                   <div className="size-4 border-2 border-primary rounded ring-2 ring-primary/20" />
                   <span className="text-muted-foreground">Hoje</span>
@@ -213,20 +315,16 @@ export function CalendarView({ obligations }: CalendarViewProps) {
                   <span className="text-muted-foreground">Final de semana</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="size-4 bg-yellow-500/20 border border-yellow-500/30 rounded" />
-                  <span className="text-muted-foreground">Pendente</span>
+                  <div className="size-4 bg-orange-500/20 border border-orange-500/30 rounded" />
+                  <span className="text-muted-foreground">💰 Impostos</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="size-4 bg-blue-500/20 border border-blue-500/30 rounded" />
-                  <span className="text-muted-foreground">Em Andamento</span>
+                  <span className="text-muted-foreground">📄 Obrigações</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="size-4 bg-green-500/20 border border-green-500/30 rounded" />
-                  <span className="text-muted-foreground">Concluída</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="size-4 bg-red-500/20 border border-red-500/30 rounded" />
-                  <span className="text-muted-foreground">Atrasada</span>
+                  <div className="size-4 bg-purple-500/20 border border-purple-500/30 rounded" />
+                  <span className="text-muted-foreground">📊 Parcelamentos</span>
                 </div>
               </div>
             </div>
@@ -238,46 +336,57 @@ export function CalendarView({ obligations }: CalendarViewProps) {
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              Obrigações de {selectedDay} de {monthNames[month]} de {year}
+              Itens de {selectedDay} de {monthNames[month]} de {year}
             </DialogTitle>
-            <DialogDescription>{selectedDayObligations.length} obrigação(ões) nesta data</DialogDescription>
+            <DialogDescription>{selectedDayItems.length} item(ns) nesta data</DialogDescription>
           </DialogHeader>
           <div className="space-y-3 mt-4">
-            {selectedDayObligations.length === 0 ? (
-              <p className="text-center text-muted-foreground py-8">Nenhuma obrigação nesta data</p>
+            {selectedDayItems.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">Nenhum item nesta data</p>
             ) : (
-              selectedDayObligations.map((obl) => (
-                <div key={obl.id} className="border rounded-lg p-4 space-y-2">
+              selectedDayItems.map((item) => (
+                <div key={item.id} className="border rounded-lg p-4 space-y-2">
                   <div className="flex items-start justify-between">
                     <div>
-                      <h4 className="font-semibold">{obl.name}</h4>
-                      <p className="text-sm text-muted-foreground">{obl.client.name}</p>
+                      <h4 className="font-semibold flex items-center gap-2">
+                        {getTypeIcon(item.type)} {item.name}
+                      </h4>
+                      <p className="text-sm text-muted-foreground">{item.client.name}</p>
                     </div>
                     <Badge
                       className={
-                        obl.status === "completed"
+                        item.status === "completed"
                           ? "bg-green-600"
-                          : obl.status === "in_progress"
+                          : item.status === "in_progress"
                             ? "bg-blue-600"
-                            : obl.status === "overdue"
+                            : item.status === "overdue"
                               ? "bg-red-600"
                               : "bg-yellow-600"
                       }
                     >
-                      {obl.status === "completed"
-                        ? "Concluída"
-                        : obl.status === "in_progress"
+                      {item.status === "completed"
+                        ? "Concluído"
+                        : item.status === "in_progress"
                           ? "Em Andamento"
-                          : obl.status === "overdue"
-                            ? "Atrasada"
+                          : item.status === "overdue"
+                            ? "Atrasado"
                             : "Pendente"}
                     </Badge>
                   </div>
-                  {obl.tax && <p className="text-sm">Imposto: {obl.tax.name}</p>}
-                  {obl.description && <p className="text-sm text-muted-foreground">{obl.description}</p>}
+                  {item.description && <p className="text-sm text-muted-foreground">{item.description}</p>}
+                  {item.installmentInfo && (
+                    <p className="text-sm">
+                      Parcela {item.installmentInfo.installmentNumber} de {item.installmentInfo.totalInstallments}
+                    </p>
+                  )}
+                  {item.amount && (
+                    <p className="text-sm font-medium">
+                      Valor: R$ {item.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </p>
+                  )}
                   <div className="flex gap-4 text-xs text-muted-foreground">
-                    <span>Vencimento: {formatDate(obl.calculatedDueDate)}</span>
-                    {obl.realizationDate && <span>Realizada: {formatDate(obl.realizationDate)}</span>}
+                    <span>Tipo: {item.type === 'tax' ? 'Imposto' : item.type === 'obligation' ? 'Obrigação' : 'Parcelamento'}</span>
+                    <span>Vencimento: {formatDate(item.dueDate)}</span>
                   </div>
                 </div>
               ))
