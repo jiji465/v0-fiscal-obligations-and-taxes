@@ -22,21 +22,36 @@ import {
   Pencil,
   Trash2,
 } from "lucide-react"
-import type { Tax } from "@/lib/types"
+import type { Tax, Client, Obligation } from "@/lib/types"
 
 export default function ImpostosPage() {
-  const [taxes, setTaxes] = useState(getTaxes())
-  const [clients, setClients] = useState(getClients())
-  const [obligations, setObligations] = useState(getObligations())
+  const [taxes, setTaxes] = useState<Tax[]>([])
+  const [clients, setClients] = useState<Client[]>([])
+  const [obligations, setObligations] = useState<Obligation[]>([])
   const [editingTax, setEditingTax] = useState<Tax | undefined>()
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("all")
   const [searchOpen, setSearchOpen] = useState(false)
+  const [loading, setLoading] = useState(true)
 
-  const updateData = () => {
-    setTaxes(getTaxes())
-    setClients(getClients())
-    setObligations(getObligations())
+  const updateData = async () => {
+    try {
+      const [taxesData, clientsData, obligationsData] = await Promise.all([
+        Promise.resolve(getTaxes()),
+        Promise.resolve(getClients()),
+        Promise.resolve(getObligations())
+      ])
+      setTaxes(taxesData || [])
+      setClients(clientsData || [])
+      setObligations(obligationsData || [])
+    } catch (error) {
+      console.error('Erro ao carregar dados:', error)
+      setTaxes([])
+      setClients([])
+      setObligations([])
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {
@@ -148,6 +163,22 @@ export default function ImpostosPage() {
           </Badge>
         )
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navigation />
+        <main className="container mx-auto px-4 py-8">
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+              <p>Carregando impostos...</p>
+            </div>
+          </div>
+        </main>
+      </div>
+    )
   }
 
   return (
