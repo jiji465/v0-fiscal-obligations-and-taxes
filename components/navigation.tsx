@@ -5,7 +5,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { LayoutDashboard, Users, FileText, Calendar, Receipt, Menu, X, BarChart3, Bell } from "lucide-react"
+import { LayoutDashboard, Users, FileText, Calendar, Receipt, Menu, X, BarChart3, Bell, CreditCard } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { getObligationsWithDetails } from "@/lib/dashboard-utils"
 import { isOverdue } from "@/lib/date-utils"
@@ -51,6 +51,7 @@ export function Navigation() {
       badge: alertCounts.pending > 0 ? alertCounts.pending : null,
       badgeVariant: "secondary" as const,
     },
+    { href: "/parcelamentos", label: "Parcelamentos", icon: CreditCard },
     {
       href: "/calendario",
       label: "Calendário",

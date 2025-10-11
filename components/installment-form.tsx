@@ -18,93 +18,72 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog"
-import type { Tax, Client, WeekendRule, RecurrenceType } from "@/lib/types"
+import type { Installment, Client, WeekendRule, RecurrenceType } from "@/lib/types"
 
-type TaxFormProps = {
-  tax?: Tax
+type InstallmentFormProps = {
+  installment?: Installment
   clients: Client[]
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSave: (tax: Tax) => void
+  onSave: (installment: Installment) => void
 }
 
-export function TaxForm({ tax, clients, open, onOpenChange, onSave }: TaxFormProps) {
-  const [formData, setFormData] = useState<Partial<Tax>>(
-    tax || {
+export function InstallmentForm({ installment, clients, open, onOpenChange, onSave }: InstallmentFormProps) {
+  const [formData, setFormData] = useState<Partial<Installment>>(
+    installment || {
       clientId: "",
-      name: "",
       description: "",
-      federalTaxCode: "",
-      dueDay: 1,
-      dueMonth: undefined,
+      installmentNumber: 1,
+      totalInstallments: 1,
+      dueDate: "",
+      amount: 0,
+      status: "pending",
       frequency: "monthly",
       recurrenceType: "monthly",
       recurrenceInterval: 1,
       recurrenceEndDate: undefined,
       autoGenerate: false,
       weekendRule: "postpone",
-      amount: undefined,
-      status: "pending",
-      priority: "medium",
-      assignedTo: "",
-      protocol: "",
       notes: "",
-      tags: [],
     },
   )
 
-  const [newTag, setNewTag] = useState("")
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    const taxData: Tax = {
-      id: tax?.id || crypto.randomUUID(),
+    const installmentData: Installment = {
+      id: installment?.id || crypto.randomUUID(),
       clientId: formData.clientId!,
-      name: formData.name!,
       description: formData.description!,
-      federalTaxCode: formData.federalTaxCode,
-      dueDay: formData.dueDay!,
-      dueMonth: formData.dueMonth,
+      installmentNumber: formData.installmentNumber!,
+      totalInstallments: formData.totalInstallments!,
+      dueDate: formData.dueDate!,
+      amount: formData.amount!,
+      status: formData.status || "pending",
       frequency: formData.frequency!,
       recurrenceType: formData.recurrenceType!,
       recurrenceInterval: formData.recurrenceInterval,
       recurrenceEndDate: formData.recurrenceEndDate,
       autoGenerate: formData.autoGenerate || false,
       weekendRule: formData.weekendRule!,
-      amount: formData.amount,
-      status: formData.status || "pending",
-      priority: formData.priority || "medium",
-      assignedTo: formData.assignedTo,
-      protocol: formData.protocol,
+      parentInstallmentId: formData.parentInstallmentId,
+      generatedFor: formData.generatedFor,
       notes: formData.notes,
-      tags: formData.tags || [],
       completedAt: formData.completedAt,
       completedBy: formData.completedBy,
-      createdAt: tax?.createdAt || new Date().toISOString(),
+      createdAt: installment?.createdAt || new Date().toISOString(),
     }
-    onSave(taxData)
+    onSave(installmentData)
     onOpenChange(false)
   }
 
-  const addTag = () => {
-    if (newTag.trim() && !formData.tags?.includes(newTag.trim())) {
-      setFormData({ ...formData, tags: [...(formData.tags || []), newTag.trim()] })
-      setNewTag("")
-    }
-  }
-
-  const removeTag = (tag: string) => {
-    setFormData({ ...formData, tags: formData.tags?.filter((t) => t !== tag) })
-  }
-
-  const getPriorityIcon = (priority: string) => {
-    switch (priority) {
-      case "urgent":
+  const getPriorityIcon = (status: string) => {
+    switch (status) {
+      case "overdue":
         return <AlertCircle className="size-4 text-red-600" />
-      case "high":
+      case "in_progress":
         return <AlertTriangle className="size-4 text-orange-600" />
-      case "medium":
-        return <Flag className="size-4 text-yellow-600" />
+      case "completed":
+        return <Flag className="size-4 text-green-600" />
       default:
         return <Flag className="size-4 text-blue-600" />
     }
@@ -114,8 +93,8 @@ export function TaxForm({ tax, clients, open, onOpenChange, onSave }: TaxFormPro
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{tax ? "Editar Imposto" : "Novo Imposto"}</DialogTitle>
-          <DialogDescription>Configure o imposto com todas as regras e vencimentos.</DialogDescription>
+          <DialogTitle>{installment ? "Editar Parcelamento" : "Novo Parcelamento"}</DialogTitle>
+          <DialogDescription>Configure o parcelamento com todas as regras e vencimentos.</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="grid gap-6 py-4">
@@ -145,35 +124,41 @@ export function TaxForm({ tax, clients, open, onOpenChange, onSave }: TaxFormPro
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="name">Nome do Imposto *</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Ex: ICMS, ISS, IRPJ"
+                <Label htmlFor="description">Descrição *</Label>
+                <Textarea
+                  id="description"
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  placeholder="Descreva o parcelamento..."
+                  rows={2}
                   required
                 />
               </div>
 
-              <div className="grid gap-2">
-                <Label htmlFor="description">Descrição (Opcional)</Label>
-                <Textarea
-                  id="description"
-                  value={formData.description || ""}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Descreva o imposto..."
-                  rows={2}
-                />
-              </div>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="installmentNumber">Parcela Atual *</Label>
+                  <Input
+                    id="installmentNumber"
+                    type="number"
+                    min="1"
+                    value={formData.installmentNumber || ""}
+                    onChange={(e) => setFormData({ ...formData, installmentNumber: Number(e.target.value) })}
+                    required
+                  />
+                </div>
 
-              <div className="grid gap-2">
-                <Label htmlFor="federalTaxCode">Código Federal (Opcional)</Label>
-                <Input
-                  id="federalTaxCode"
-                  value={formData.federalTaxCode}
-                  onChange={(e) => setFormData({ ...formData, federalTaxCode: e.target.value })}
-                  placeholder="Ex: 1234"
-                />
+                <div className="grid gap-2">
+                  <Label htmlFor="totalInstallments">Total de Parcelas *</Label>
+                  <Input
+                    id="totalInstallments"
+                    type="number"
+                    min="1"
+                    value={formData.totalInstallments || ""}
+                    onChange={(e) => setFormData({ ...formData, totalInstallments: Number(e.target.value) })}
+                    required
+                  />
+                </div>
               </div>
             </div>
 
@@ -183,27 +168,9 @@ export function TaxForm({ tax, clients, open, onOpenChange, onSave }: TaxFormPro
 
               <div className="grid sm:grid-cols-3 gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="priority" className="flex items-center gap-2">
-                    Prioridade *{getPriorityIcon(formData.priority || "medium")}
+                  <Label htmlFor="status" className="flex items-center gap-2">
+                    Status *{getPriorityIcon(formData.status || "pending")}
                   </Label>
-                  <Select
-                    value={formData.priority}
-                    onValueChange={(value) => setFormData({ ...formData, priority: value as any })}
-                  >
-                    <SelectTrigger id="priority">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="low">Baixa</SelectItem>
-                      <SelectItem value="medium">Média</SelectItem>
-                      <SelectItem value="high">Alta</SelectItem>
-                      <SelectItem value="urgent">Urgente</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="grid gap-2">
-                  <Label htmlFor="status">Status *</Label>
                   <Select
                     value={formData.status}
                     onValueChange={(value) => setFormData({ ...formData, status: value as any })}
@@ -221,24 +188,29 @@ export function TaxForm({ tax, clients, open, onOpenChange, onSave }: TaxFormPro
                 </div>
 
                 <div className="grid gap-2">
-                  <Label htmlFor="assignedTo">Responsável</Label>
+                  <Label htmlFor="dueDate">Data de Vencimento *</Label>
                   <Input
-                    id="assignedTo"
-                    value={formData.assignedTo || ""}
-                    onChange={(e) => setFormData({ ...formData, assignedTo: e.target.value })}
-                    placeholder="Nome do responsável"
+                    id="dueDate"
+                    type="date"
+                    value={formData.dueDate || ""}
+                    onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+                    required
                   />
                 </div>
-              </div>
 
-              <div className="grid gap-2">
-                <Label htmlFor="protocol">Protocolo/Processo</Label>
-                <Input
-                  id="protocol"
-                  value={formData.protocol || ""}
-                  onChange={(e) => setFormData({ ...formData, protocol: e.target.value })}
-                  placeholder="Número do protocolo"
-                />
+                <div className="grid gap-2">
+                  <Label htmlFor="amount">Valor *</Label>
+                  <Input
+                    id="amount"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.amount || ""}
+                    onChange={(e) => setFormData({ ...formData, amount: Number(e.target.value) })}
+                    placeholder="0,00"
+                    required
+                  />
+                </div>
               </div>
             </div>
 
@@ -284,7 +256,7 @@ export function TaxForm({ tax, clients, open, onOpenChange, onSave }: TaxFormPro
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <Label htmlFor="autoGenerate">Gerar Automaticamente</Label>
-                  <p className="text-xs text-muted-foreground">Criar próximas ocorrências automaticamente</p>
+                  <p className="text-xs text-muted-foreground">Criar próximas parcelas automaticamente</p>
                 </div>
                 <Switch
                   id="autoGenerate"
@@ -311,46 +283,21 @@ export function TaxForm({ tax, clients, open, onOpenChange, onSave }: TaxFormPro
             <div className="space-y-4 border-t pt-4">
               <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Vencimentos</h3>
 
-              <div className="grid sm:grid-cols-3 gap-4">
+              <div className="grid sm:grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="dueDay">Dia do Vencimento *</Label>
-                  <Input
-                    id="dueDay"
-                    type="number"
-                    min="1"
-                    max="31"
-                    value={formData.dueDay || ""}
-                    onChange={(e) =>
-                      setFormData({ ...formData, dueDay: e.target.value ? Number(e.target.value) : 1 })
-                    }
-                    placeholder="Ex: 15"
-                    required
-                  />
-                </div>
-
-                <div className="grid gap-2">
-                  <Label htmlFor="dueMonth">Mês Específico (Opcional)</Label>
+                  <Label htmlFor="frequency">Frequência *</Label>
                   <Select
-                    value={formData.dueMonth?.toString() || ""}
-                    onValueChange={(value) => setFormData({ ...formData, dueMonth: value ? Number(value) : undefined })}
+                    value={formData.frequency}
+                    onValueChange={(value) => setFormData({ ...formData, frequency: value as any })}
                   >
-                    <SelectTrigger id="dueMonth">
-                      <SelectValue placeholder="Qualquer mês" />
+                    <SelectTrigger id="frequency">
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Qualquer mês</SelectItem>
-                      <SelectItem value="1">Janeiro</SelectItem>
-                      <SelectItem value="2">Fevereiro</SelectItem>
-                      <SelectItem value="3">Março</SelectItem>
-                      <SelectItem value="4">Abril</SelectItem>
-                      <SelectItem value="5">Maio</SelectItem>
-                      <SelectItem value="6">Junho</SelectItem>
-                      <SelectItem value="7">Julho</SelectItem>
-                      <SelectItem value="8">Agosto</SelectItem>
-                      <SelectItem value="9">Setembro</SelectItem>
-                      <SelectItem value="10">Outubro</SelectItem>
-                      <SelectItem value="11">Novembro</SelectItem>
-                      <SelectItem value="12">Dezembro</SelectItem>
+                      <SelectItem value="monthly">Mensal</SelectItem>
+                      <SelectItem value="quarterly">Trimestral</SelectItem>
+                      <SelectItem value="annual">Anual</SelectItem>
+                      <SelectItem value="custom">Personalizado</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -372,41 +319,6 @@ export function TaxForm({ tax, clients, open, onOpenChange, onSave }: TaxFormPro
                   </Select>
                 </div>
               </div>
-
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="frequency">Frequência *</Label>
-                  <Select
-                    value={formData.frequency}
-                    onValueChange={(value) => setFormData({ ...formData, frequency: value as any })}
-                  >
-                    <SelectTrigger id="frequency">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="monthly">Mensal</SelectItem>
-                      <SelectItem value="quarterly">Trimestral</SelectItem>
-                      <SelectItem value="annual">Anual</SelectItem>
-                      <SelectItem value="custom">Personalizado</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="grid gap-2">
-                  <Label htmlFor="amount">Valor (Opcional)</Label>
-                  <Input
-                    id="amount"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={formData.amount || ""}
-                    onChange={(e) =>
-                      setFormData({ ...formData, amount: e.target.value ? Number(e.target.value) : undefined })
-                    }
-                    placeholder="0,00"
-                  />
-                </div>
-              </div>
             </div>
 
             {/* Informações Adicionais */}
@@ -425,46 +337,13 @@ export function TaxForm({ tax, clients, open, onOpenChange, onSave }: TaxFormPro
                   rows={3}
                 />
               </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="tags">Tags</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="tags"
-                    value={newTag}
-                    onChange={(e) => setNewTag(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault()
-                        addTag()
-                      }
-                    }}
-                    placeholder="Adicionar tag..."
-                  />
-                  <Button type="button" variant="outline" onClick={addTag}>
-                    Adicionar
-                  </Button>
-                </div>
-                {formData.tags && formData.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {formData.tags.map((tag) => (
-                      <Badge key={tag} variant="secondary" className="gap-1">
-                        {tag}
-                        <button type="button" onClick={() => removeTag(tag)} className="ml-1 hover:text-destructive">
-                          <X className="size-3" />
-                        </button>
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-              </div>
             </div>
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
-            <Button type="submit">Salvar Imposto</Button>
+            <Button type="submit">Salvar Parcelamento</Button>
           </DialogFooter>
         </form>
       </DialogContent>

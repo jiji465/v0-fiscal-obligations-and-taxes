@@ -1,36 +1,7 @@
-import type { DashboardStats, ObligationWithDetails } from "./types"
-import { getClients, getTaxes, getObligations } from "./storage"
+import type { DashboardStats, ObligationWithDetails, Client, Obligation } from "./types"
 import { calculateDueDate, isOverdue, isUpcomingThisWeek } from "./date-utils"
 
-export const getObligationsWithDetails = (): ObligationWithDetails[] => {
-  const obligations = getObligations()
-  const clients = getClients()
-  const taxes = getTaxes()
-
-  return obligations.map((obligation) => {
-    const client = clients.find((c) => c.id === obligation.clientId)!
-    const tax = obligation.taxId ? taxes.find((t) => t.id === obligation.taxId) : undefined
-
-    const calculatedDueDate = calculateDueDate(
-      obligation.dueDay,
-      obligation.dueMonth,
-      obligation.frequency,
-      obligation.weekendRule,
-    ).toISOString()
-
-    return {
-      ...obligation,
-      client,
-      tax,
-      calculatedDueDate,
-    }
-  })
-}
-
-export const calculateDashboardStats = (): DashboardStats => {
-  const clients = getClients()
-  const obligations = getObligationsWithDetails()
-
+export const calculateDashboardStats = (obligations: ObligationWithDetails[], clients: Client[]): DashboardStats => {
   const activeClients = clients.filter((c) => c.status === "active").length
   const pendingObligations = obligations.filter((o) => o.status === "pending")
   const overdueObligations = pendingObligations.filter((o) => isOverdue(o.calculatedDueDate))

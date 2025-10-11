@@ -8,23 +8,30 @@ import { UpcomingObligations } from "@/components/upcoming-obligations"
 import { ClientOverview } from "@/components/client-overview"
 import { TaxCalendar } from "@/components/tax-calendar"
 import { QuickActions } from "@/components/quick-actions"
-import { getClients, getTaxes } from "@/lib/storage"
-import { getObligationsWithDetails, calculateDashboardStats } from "@/lib/dashboard-utils"
+import { getClients, getTaxes, getObligationsWithDetails } from "@/lib/supabase-storage"
+import { calculateDashboardStats } from "@/lib/dashboard-utils"
+import type { ObligationWithDetails, Client, Tax } from "@/lib/types"
 import { TrendingUp, CalendarIcon, AlertCircle } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 
 export default function DashboardPage() {
-  const [stats, setStats] = useState(calculateDashboardStats())
-  const [obligations, setObligations] = useState(getObligationsWithDetails())
-  const [clients, setClients] = useState(getClients())
-  const [taxes, setTaxes] = useState(getTaxes())
+  const [stats, setStats] = useState(calculateDashboardStats([], []))
+  const [obligations, setObligations] = useState<ObligationWithDetails[]>([])
+  const [clients, setClients] = useState<Client[]>([])
+  const [taxes, setTaxes] = useState<Tax[]>([])
 
-  const updateData = () => {
-    setStats(calculateDashboardStats())
-    setObligations(getObligationsWithDetails())
-    setClients(getClients())
-    setTaxes(getTaxes())
+  const updateData = async () => {
+    const [obligationsData, clientsData, taxesData] = await Promise.all([
+      getObligationsWithDetails(),
+      getClients(),
+      getTaxes()
+    ])
+    
+    setObligations(obligationsData)
+    setClients(clientsData)
+    setTaxes(taxesData)
+    setStats(calculateDashboardStats(obligationsData, clientsData))
   }
 
   useEffect(() => {

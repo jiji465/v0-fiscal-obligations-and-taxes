@@ -1,19 +1,31 @@
+export type TaxRegime = "simples_nacional" | "lucro_presumido" | "lucro_real" | "mei"
+
 export type Client = {
   id: string
   name: string
   cnpj: string
   email: string
   phone: string
+  taxRegime: TaxRegime
   status: "active" | "inactive"
   createdAt: string
 }
 
 export type Tax = {
   id: string
+  clientId: string
   name: string
   description: string
   federalTaxCode?: string
-  dueDay?: number // Dia do vencimento do imposto (1-31)
+  dueDay: number // Dia do vencimento do imposto (1-31)
+  dueMonth?: number // Mês específico (1-12)
+  frequency: "monthly" | "quarterly" | "annual" | "custom"
+  recurrenceType: RecurrenceType
+  recurrenceInterval?: number
+  recurrenceEndDate?: string
+  autoGenerate: boolean
+  weekendRule: WeekendRule
+  amount?: number
   status: "pending" | "in_progress" | "completed" | "overdue"
   priority: Priority
   assignedTo?: string
@@ -22,6 +34,8 @@ export type Tax = {
   notes?: string
   completedAt?: string
   completedBy?: string
+  parentTaxId?: string
+  generatedFor?: string
   history?: ObligationHistory[]
   tags?: string[]
   createdAt: string
@@ -90,9 +104,37 @@ export type ObligationHistory = {
   user?: string
 }
 
+export type Installment = {
+  id: string
+  clientId: string
+  description: string
+  installmentNumber: number
+  totalInstallments: number
+  dueDate: string
+  amount: number
+  status: "pending" | "in_progress" | "completed" | "overdue"
+  frequency: "monthly" | "quarterly" | "annual" | "custom"
+  recurrenceType: RecurrenceType
+  recurrenceInterval?: number
+  recurrenceEndDate?: string
+  autoGenerate: boolean
+  weekendRule: WeekendRule
+  parentInstallmentId?: string
+  generatedFor?: string
+  notes?: string
+  completedAt?: string
+  completedBy?: string
+  createdAt: string
+}
+
 export type ObligationWithDetails = Obligation & {
   client: Client
   tax?: Tax
+  calculatedDueDate: string
+}
+
+export type InstallmentWithDetails = Installment & {
+  client: Client
   calculatedDueDate: string
 }
 

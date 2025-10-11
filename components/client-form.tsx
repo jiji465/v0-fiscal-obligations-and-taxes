@@ -15,7 +15,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog"
-import type { Client } from "@/lib/types"
+import type { Client, TaxRegime } from "@/lib/types"
 
 type ClientFormProps = {
   client?: Client
@@ -31,6 +31,7 @@ export function ClientForm({ client, open, onOpenChange, onSave }: ClientFormPro
       cnpj: "",
       email: "",
       phone: "",
+      taxRegime: "simples_nacional",
       status: "active",
     },
   )
@@ -43,6 +44,7 @@ export function ClientForm({ client, open, onOpenChange, onSave }: ClientFormPro
       cnpj: formData.cnpj!,
       email: formData.email || "",
       phone: formData.phone || "",
+      taxRegime: formData.taxRegime as TaxRegime,
       status: formData.status as "active" | "inactive",
       createdAt: client?.createdAt || new Date().toISOString(),
     }
@@ -95,6 +97,23 @@ export function ClientForm({ client, open, onOpenChange, onSave }: ClientFormPro
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                 placeholder="(00) 00000-0000"
               />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="taxRegime">Regime Tributário</Label>
+              <Select
+                value={formData.taxRegime}
+                onValueChange={(value) => setFormData({ ...formData, taxRegime: value as TaxRegime })}
+              >
+                <SelectTrigger id="taxRegime">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="simples_nacional">Simples Nacional</SelectItem>
+                  <SelectItem value="lucro_presumido">Lucro Presumido</SelectItem>
+                  <SelectItem value="lucro_real">Lucro Real</SelectItem>
+                  <SelectItem value="mei">MEI</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="status">Status</Label>
