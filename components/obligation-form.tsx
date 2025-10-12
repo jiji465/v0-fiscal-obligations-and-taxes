@@ -39,7 +39,7 @@ export function ObligationForm({ obligation, clients, taxes, open, onOpenChange,
       taxId: "",
       dueDay: 10,
       frequency: "monthly",
-      recurrence: "monthly",
+      recurrenceType: "monthly",
       recurrenceInterval: 1,
       autoGenerate: false,
       weekendRule: "postpone",
@@ -75,7 +75,7 @@ export function ObligationForm({ obligation, clients, taxes, open, onOpenChange,
       dueDay: Number(formData.dueDay!),
       dueMonth: formData.dueMonth ? Number(formData.dueMonth) : undefined,
       frequency: formData.frequency as "monthly" | "quarterly" | "annual" | "custom",
-      recurrence: formData.recurrence as any,
+      recurrenceType: formData.recurrenceType as any,
       recurrenceInterval: formData.recurrenceInterval,
       recurrenceEndDate: formData.recurrenceEndDate,
       autoGenerate: formData.autoGenerate || false,
@@ -287,12 +287,12 @@ export function ObligationForm({ obligation, clients, taxes, open, onOpenChange,
 
               <div className="grid sm:grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="recurrence">Tipo de Recorrência *</Label>
+                  <Label htmlFor="recurrenceType">Tipo de Recorrência *</Label>
                   <Select
-                    value={formData.recurrence}
-                    onValueChange={(value) => setFormData({ ...formData, recurrence: value as any })}
+                    value={formData.recurrenceType}
+                    onValueChange={(value) => setFormData({ ...formData, recurrenceType: value as any })}
                   >
-                    <SelectTrigger id="recurrence">
+                    <SelectTrigger id="recurrenceType">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -306,7 +306,7 @@ export function ObligationForm({ obligation, clients, taxes, open, onOpenChange,
                   </Select>
                 </div>
 
-                {formData.recurrence === "custom" && (
+                {formData.recurrenceType === "custom" && (
                   <div className="grid gap-2">
                     <Label htmlFor="recurrenceInterval">Intervalo (meses)</Label>
                     <Input
