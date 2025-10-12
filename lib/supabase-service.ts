@@ -296,6 +296,7 @@ export async function getObligations(): Promise<Obligation[]> {
 
 export async function createObligation(obligation: Omit<Obligation, 'id' | 'createdAt'>): Promise<Obligation> {
   try {
+    // Forçando a atualização do arquivo
     const { data, error } = await supabase
       .from('obligations')
       .insert({
