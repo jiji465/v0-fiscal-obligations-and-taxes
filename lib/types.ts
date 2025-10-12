@@ -74,7 +74,7 @@ export type Obligation = {
   dueDay: number
   dueMonth?: number
   frequency: "monthly" | "quarterly" | "annual" | "custom"
-  recurrence: RecurrenceType
+  recurrenceType: RecurrenceType
   recurrenceInterval?: number
   recurrenceEndDate?: string
   autoGenerate: boolean
