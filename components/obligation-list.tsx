@@ -24,7 +24,7 @@ import {
   Clock,
 } from "lucide-react"
 import type { ObligationWithDetails, Client, Tax } from "@/lib/types"
-import { saveObligation, deleteObligation } from "@/lib/storage"
+import { saveObligation, deleteObligation } from "@/lib/supabase/database"
 import { formatDate, isOverdue } from "@/lib/date-utils"
 import { getRecurrenceDescription } from "@/lib/recurrence-utils"
 

@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Navigation } from "@/components/navigation"
 import { InstallmentForm } from "@/components/installment-form"
-import { getInstallments, getClients, getTaxes, saveInstallment, deleteInstallment } from "@/lib/storage"
+import { getInstallments, getClients, getTaxes, saveInstallment, deleteInstallment } from "@/lib/supabase/database"
 import type { Installment, Client, Tax } from "@/lib/types"
 import { Plus, Search, Pencil, Trash2, Play, CheckCircle2, AlertCircle, Flame, TrendingUp, Zap } from "lucide-react"
 import { formatDate, adjustForWeekend } from "@/lib/date-utils"
@@ -23,15 +23,28 @@ export default function ParcelamentosPage() {
   const [clientFilter, setClientFilter] = useState<string>("all")
   const [selectedInstallment, setSelectedInstallment] = useState<Installment | undefined>()
   const [isFormOpen, setIsFormOpen] = useState(false)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     loadData()
   }, [])
 
-  const loadData = () => {
-    setInstallments(getInstallments())
-    setClients(getClients())
-    setTaxes(getTaxes())
+  const loadData = async () => {
+    setLoading(true)
+    try {
+      const [installmentsData, clientsData, taxesData] = await Promise.all([
+        getInstallments(),
+        getClients(),
+        getTaxes(),
+      ])
+      setInstallments(installmentsData)
+      setClients(clientsData)
+      setTaxes(taxesData)
+    } catch (error) {
+      console.error("[v0] Error loading data:", error)
+    } finally {
+      setLoading(false)
+    }
   }
 
   const getClientName = (clientId: string) => {
@@ -95,27 +108,40 @@ export default function ParcelamentosPage() {
     setIsFormOpen(true)
   }
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm("Tem certeza que deseja excluir este parcelamento?")) {
-      deleteInstallment(id)
-      loadData()
+      try {
+        await deleteInstallment(id)
+        await loadData()
+      } catch (error) {
+        console.error("[v0] Error deleting installment:", error)
+        alert("Erro ao excluir parcelamento. Tente novamente.")
+      }
     }
   }
 
-  const handleStartInstallment = (installment: Installment) => {
-    const updated = { ...installment, status: "in_progress" as const }
-    saveInstallment(updated)
-    loadData()
+  const handleStartInstallment = async (installment: Installment) => {
+    try {
+      const updated = { ...installment, status: "in_progress" as const }
+      await saveInstallment(updated)
+      await loadData()
+    } catch (error) {
+      console.error("[v0] Error starting installment:", error)
+    }
   }
 
-  const handleCompleteInstallment = (installment: Installment) => {
-    const updated = {
-      ...installment,
-      status: "completed" as const,
-      completedAt: new Date().toISOString(),
+  const handleCompleteInstallment = async (installment: Installment) => {
+    try {
+      const updated = {
+        ...installment,
+        status: "completed" as const,
+        completedAt: new Date().toISOString(),
+      }
+      await saveInstallment(updated)
+      await loadData()
+    } catch (error) {
+      console.error("[v0] Error completing installment:", error)
     }
-    saveInstallment(updated)
-    loadData()
   }
 
   const getStatusBadge = (installment: Installment) => {

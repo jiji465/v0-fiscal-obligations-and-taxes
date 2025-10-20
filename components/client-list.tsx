@@ -9,7 +9,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { ClientForm } from "./client-form"
 import { MoreVertical, Pencil, Trash2, Search, Plus } from "lucide-react"
 import type { Client } from "@/lib/types"
-import { saveClient, deleteClient } from "@/lib/storage"
+import { saveClient, deleteClient } from "@/lib/supabase/database"
 
 type ClientListProps = {
   clients: Client[]

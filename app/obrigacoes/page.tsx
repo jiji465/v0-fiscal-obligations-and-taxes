@@ -8,22 +8,31 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { getClients, getTaxes } from "@/lib/storage"
-import { getObligationsWithDetails } from "@/lib/dashboard-utils"
+import { getClients, getTaxes, getObligations } from "@/lib/supabase/database"
 import { isOverdue } from "@/lib/date-utils"
 import { CheckCircle2, Clock, PlayCircle, AlertTriangle, Search } from "lucide-react"
+import type { Client, Tax, Obligation } from "@/lib/types"
 
 export default function ObligacoesPage() {
-  const [obligations, setObligations] = useState(getObligationsWithDetails())
-  const [clients, setClients] = useState(getClients())
-  const [taxes, setTaxes] = useState(getTaxes())
+  const [obligations, setObligations] = useState<Obligation[]>([])
+  const [clients, setClients] = useState<Client[]>([])
+  const [taxes, setTaxes] = useState<Tax[]>([])
   const [activeTab, setActiveTab] = useState("all")
   const [searchOpen, setSearchOpen] = useState(false)
+  const [loading, setLoading] = useState(true)
 
-  const updateData = () => {
-    setObligations(getObligationsWithDetails())
-    setClients(getClients())
-    setTaxes(getTaxes())
+  const updateData = async () => {
+    setLoading(true)
+    try {
+      const [obligationsData, clientsData, taxesData] = await Promise.all([getObligations(), getClients(), getTaxes()])
+      setObligations(obligationsData)
+      setClients(clientsData)
+      setTaxes(taxesData)
+    } catch (error) {
+      console.error("[v0] Error loading data:", error)
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {

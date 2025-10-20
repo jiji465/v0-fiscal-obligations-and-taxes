@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { getTaxes, saveTax, deleteTax, getClients, getObligations } from "@/lib/storage"
+import { getTaxes, saveTax, deleteTax, getClients, getObligations } from "@/lib/supabase/database"
 import {
   CheckCircle2,
   Clock,
@@ -22,21 +22,30 @@ import {
   Pencil,
   Trash2,
 } from "lucide-react"
-import type { Tax } from "@/lib/types"
+import type { Tax, Client, Obligation } from "@/lib/types"
 
 export default function ImpostosPage() {
-  const [taxes, setTaxes] = useState(getTaxes())
-  const [clients, setClients] = useState(getClients())
-  const [obligations, setObligations] = useState(getObligations())
+  const [taxes, setTaxes] = useState<Tax[]>([])
+  const [clients, setClients] = useState<Client[]>([])
+  const [obligations, setObligations] = useState<Obligation[]>([])
   const [editingTax, setEditingTax] = useState<Tax | undefined>()
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("all")
   const [searchOpen, setSearchOpen] = useState(false)
+  const [loading, setLoading] = useState(true)
 
-  const updateData = () => {
-    setTaxes(getTaxes())
-    setClients(getClients())
-    setObligations(getObligations())
+  const updateData = async () => {
+    setLoading(true)
+    try {
+      const [taxesData, clientsData, obligationsData] = await Promise.all([getTaxes(), getClients(), getObligations()])
+      setTaxes(taxesData)
+      setClients(clientsData)
+      setObligations(obligationsData)
+    } catch (error) {
+      console.error("[v0] Error loading data:", error)
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {
@@ -55,17 +64,27 @@ export default function ImpostosPage() {
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [])
 
-  const handleSave = (tax: Tax) => {
-    saveTax(tax)
-    updateData()
-    setEditingTax(undefined)
-    setIsFormOpen(false)
+  const handleSave = async (tax: Tax) => {
+    try {
+      await saveTax(tax)
+      await updateData()
+      setEditingTax(undefined)
+      setIsFormOpen(false)
+    } catch (error) {
+      console.error("[v0] Error saving tax:", error)
+      alert("Erro ao salvar imposto. Tente novamente.")
+    }
   }
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm("Tem certeza que deseja excluir este imposto?")) {
-      deleteTax(id)
-      updateData()
+      try {
+        await deleteTax(id)
+        await updateData()
+      } catch (error) {
+        console.error("[v0] Error deleting tax:", error)
+        alert("Erro ao excluir imposto. Tente novamente.")
+      }
     }
   }
 
@@ -79,22 +98,29 @@ export default function ImpostosPage() {
     setIsFormOpen(true)
   }
 
-  const handleStartTax = (tax: Tax) => {
-    const updatedTax = { ...tax, status: "in_progress" as const }
-    saveTax(updatedTax)
-    updateData()
+  const handleStartTax = async (tax: Tax) => {
+    try {
+      const updatedTax = { ...tax, status: "in_progress" as const }
+      await saveTax(updatedTax)
+      await updateData()
+    } catch (error) {
+      console.error("[v0] Error starting tax:", error)
+    }
   }
 
-  const handleCompleteTax = (tax: Tax) => {
-    const updatedTax = {
-      ...tax,
-      status: "completed" as const,
-      completedAt: new Date().toISOString(),
+  const handleCompleteTax = async (tax: Tax) => {
+    try {
+      const updatedTax = {
+        ...tax,
+        status: "completed" as const,
+        completedAt: new Date().toISOString(),
+      }
+      await saveTax(updatedTax)
+      await updateData()
+    } catch (error) {
+      console.error("[v0] Error completing tax:", error)
     }
-    saveTax(updatedTax)
-    updateData()
   }
-  // </CHANGE>
 
   const pendingTaxes = taxes.filter((t) => t.status === "pending")
   const inProgressTaxes = taxes.filter((t) => t.status === "in_progress")
@@ -115,7 +141,6 @@ export default function ImpostosPage() {
         return taxes
     }
   }
-  // </CHANGE>
 
   const getStatusBadge = (status: Tax["status"], completedAt?: string) => {
     switch (status) {
