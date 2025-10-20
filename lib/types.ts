@@ -1,31 +1,19 @@
-export type TaxRegime = "simples_nacional" | "lucro_presumido" | "lucro_real" | "mei"
-
 export type Client = {
   id: string
   name: string
   cnpj: string
   email: string
   phone: string
-  taxRegime: TaxRegime
   status: "active" | "inactive"
   createdAt: string
 }
 
 export type Tax = {
   id: string
-  clientId: string
   name: string
   description: string
   federalTaxCode?: string
-  dueDay: number // Dia do vencimento do imposto (1-31)
-  dueMonth?: number // Mês específico (1-12)
-  frequency: "monthly" | "quarterly" | "annual" | "custom"
-  recurrenceType: RecurrenceType
-  recurrenceInterval?: number
-  recurrenceEndDate?: string
-  autoGenerate: boolean
-  weekendRule: WeekendRule
-  amount?: number
+  dueDay?: number // Dia do vencimento do imposto (1-31)
   status: "pending" | "in_progress" | "completed" | "overdue"
   priority: Priority
   assignedTo?: string
@@ -34,8 +22,6 @@ export type Tax = {
   notes?: string
   completedAt?: string
   completedBy?: string
-  parentTaxId?: string
-  generatedFor?: string
   history?: ObligationHistory[]
   tags?: string[]
   createdAt: string
@@ -74,7 +60,7 @@ export type Obligation = {
   dueDay: number
   dueMonth?: number
   frequency: "monthly" | "quarterly" | "annual" | "custom"
-  recurrenceType: RecurrenceType
+  recurrence: RecurrenceType
   recurrenceInterval?: number
   recurrenceEndDate?: string
   autoGenerate: boolean
@@ -84,7 +70,6 @@ export type Obligation = {
   assignedTo?: string
   protocol?: string
   realizationDate?: string
-  amount?: number
   notes?: string
   createdAt: string
   completedAt?: string // Data de quando foi concluída
@@ -96,35 +81,41 @@ export type Obligation = {
   tags?: string[]
 }
 
+export type Installment = {
+  id: string
+  name: string
+  description?: string
+  clientId: string
+  taxId?: string
+  installmentCount: number
+  currentInstallment: number
+  dueDay: number
+  firstDueDate: string
+  weekendRule: WeekendRule
+  status: "pending" | "in_progress" | "completed" | "overdue"
+  priority: Priority
+  assignedTo?: string
+  protocol?: string
+  realizationDate?: string
+  notes?: string
+  createdAt: string
+  completedAt?: string
+  completedBy?: string
+  history?: ObligationHistory[]
+  tags?: string[]
+  paymentMethod?: string
+  referenceNumber?: string
+  autoGenerate: boolean
+  recurrence: RecurrenceType
+  recurrenceInterval?: number
+}
+
 export type ObligationHistory = {
   id: string
   action: "created" | "updated" | "completed" | "status_changed" | "comment_added"
   description: string
   timestamp: string
   user?: string
-}
-
-export type Installment = {
-  id: string
-  clientId: string
-  description: string
-  installmentNumber: number
-  totalInstallments: number
-  dueDate: string
-  amount: number
-  status: "pending" | "in_progress" | "completed" | "overdue"
-  frequency: "monthly" | "quarterly" | "annual" | "custom"
-  recurrenceType: RecurrenceType
-  recurrenceInterval?: number
-  recurrenceEndDate?: string
-  autoGenerate: boolean
-  weekendRule: WeekendRule
-  parentInstallmentId?: string
-  generatedFor?: string
-  notes?: string
-  completedAt?: string
-  completedBy?: string
-  createdAt: string
 }
 
 export type ObligationWithDetails = Obligation & {
@@ -135,6 +126,7 @@ export type ObligationWithDetails = Obligation & {
 
 export type InstallmentWithDetails = Installment & {
   client: Client
+  tax?: Tax
   calculatedDueDate: string
 }
 

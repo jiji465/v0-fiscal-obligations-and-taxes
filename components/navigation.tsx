@@ -20,27 +20,18 @@ export function Navigation() {
   })
 
   useEffect(() => {
-    const loadAlertCounts = async () => {
-      try {
-        const obligations = await getObligationsWithDetails()
-        const overdue = obligations.filter((o) => isOverdue(o.calculatedDueDate) && o.status !== "completed").length
-        const pending = obligations.filter((o) => o.status === "pending").length
+    const obligations = getObligationsWithDetails()
+    const overdue = obligations.filter((o) => isOverdue(o.calculatedDueDate) && o.status !== "completed").length
+    const pending = obligations.filter((o) => o.status === "pending").length
 
-        const today = new Date()
-        const nextWeek = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)
-        const thisWeek = obligations.filter((o) => {
-          const dueDate = new Date(o.calculatedDueDate)
-          return dueDate >= today && dueDate <= nextWeek && o.status !== "completed"
-        }).length
+    const today = new Date()
+    const nextWeek = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)
+    const thisWeek = obligations.filter((o) => {
+      const dueDate = new Date(o.calculatedDueDate)
+      return dueDate >= today && dueDate <= nextWeek && o.status !== "completed"
+    }).length
 
-        setAlertCounts({ overdue, pending, thisWeek })
-      } catch (error) {
-        console.error('Erro ao carregar alertas:', error)
-        setAlertCounts({ overdue: 0, pending: 0, thisWeek: 0 })
-      }
-    }
-
-    loadAlertCounts()
+    setAlertCounts({ overdue, pending, thisWeek })
   }, [pathname])
 
   const navItems = [

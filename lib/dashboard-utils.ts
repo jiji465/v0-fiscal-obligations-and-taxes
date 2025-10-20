@@ -1,8 +1,36 @@
-import type { DashboardStats, ObligationWithDetails, Client, Obligation } from "./types"
+import type { DashboardStats, ObligationWithDetails } from "./types"
+import { getClients, getTaxes, getObligations } from "./storage"
 import { calculateDueDate, isOverdue, isUpcomingThisWeek } from "./date-utils"
-import { getObligations } from "./supabase-service"
 
-export const calculateDashboardStats = (obligations: ObligationWithDetails[], clients: Client[]): DashboardStats => {
+export const getObligationsWithDetails = (): ObligationWithDetails[] => {
+  const obligations = getObligations()
+  const clients = getClients()
+  const taxes = getTaxes()
+
+  return obligations.map((obligation) => {
+    const client = clients.find((c) => c.id === obligation.clientId)!
+    const tax = obligation.taxId ? taxes.find((t) => t.id === obligation.taxId) : undefined
+
+    const calculatedDueDate = calculateDueDate(
+      obligation.dueDay,
+      obligation.dueMonth,
+      obligation.frequency,
+      obligation.weekendRule,
+    ).toISOString()
+
+    return {
+      ...obligation,
+      client,
+      tax,
+      calculatedDueDate,
+    }
+  })
+}
+
+export const calculateDashboardStats = (): DashboardStats => {
+  const clients = getClients()
+  const obligations = getObligationsWithDetails()
+
   const activeClients = clients.filter((c) => c.status === "active").length
   const pendingObligations = obligations.filter((o) => o.status === "pending")
   const overdueObligations = pendingObligations.filter((o) => isOverdue(o.calculatedDueDate))
@@ -27,29 +55,5 @@ export const calculateDashboardStats = (obligations: ObligationWithDetails[], cl
     completedThisMonth,
     overdueObligations: overdueObligations.length,
     upcomingThisWeek: upcomingThisWeek.length,
-  }
-}
-
-export const getObligationsWithDetails = async (): Promise<ObligationWithDetails[]> => {
-  try {
-    const obligations = await getObligations()
-    
-    return obligations.map(obligation => ({
-      ...obligation,
-      client: {
-        id: obligation.clientId,
-        name: 'Cliente',
-        cnpj: '00.000.000/0000-00',
-        email: '',
-        phone: '',
-        taxRegime: 'simples_nacional',
-        status: 'active',
-        createdAt: new Date().toISOString()
-      },
-      calculatedDueDate: new Date().toISOString().split('T')[0]
-    }))
-  } catch (error) {
-    console.error('Erro ao buscar obrigações:', error)
-    return []
   }
 }

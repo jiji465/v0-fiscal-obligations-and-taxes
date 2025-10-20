@@ -1,270 +1,329 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState, useEffect, useMemo } from "react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Navigation } from "@/components/navigation"
 import { InstallmentForm } from "@/components/installment-form"
-import { getInstallmentsWithDetails, getClients, saveInstallment, deleteInstallment } from "@/lib/supabase-storage"
-import { formatDate, formatCurrency } from "@/lib/date-utils"
-import { Plus, Edit, Trash2, Calendar, DollarSign, User } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import type { InstallmentWithDetails, Client } from "@/lib/types"
+import { getInstallments, getClients, getTaxes, saveInstallment, deleteInstallment } from "@/lib/storage"
+import type { Installment, Client, Tax } from "@/lib/types"
+import { Plus, Search, Pencil, Trash2, Play, CheckCircle2, AlertCircle, Flame, TrendingUp, Zap } from "lucide-react"
+import { formatDate, adjustForWeekend } from "@/lib/date-utils"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
-export default function InstallmentsPage() {
-  const [installments, setInstallments] = useState<InstallmentWithDetails[]>([])
+export default function ParcelamentosPage() {
+  const [installments, setInstallments] = useState<Installment[]>([])
   const [clients, setClients] = useState<Client[]>([])
-  const [isFormOpen, setIsFormOpen] = useState(false)
-  const [editingInstallment, setEditingInstallment] = useState<InstallmentWithDetails | undefined>()
+  const [taxes, setTaxes] = useState<Tax[]>([])
   const [searchTerm, setSearchTerm] = useState("")
-  const [statusFilter, setStatusFilter] = useState("all")
-  const [clientFilter, setClientFilter] = useState("all")
-
-  const loadData = async () => {
-    const [installmentsData, clientsData] = await Promise.all([
-      getInstallmentsWithDetails(),
-      getClients()
-    ])
-    setInstallments(installmentsData)
-    setClients(clientsData)
-  }
+  const [statusFilter, setStatusFilter] = useState<string>("all")
+  const [clientFilter, setClientFilter] = useState<string>("all")
+  const [selectedInstallment, setSelectedInstallment] = useState<Installment | undefined>()
+  const [isFormOpen, setIsFormOpen] = useState(false)
 
   useEffect(() => {
     loadData()
   }, [])
 
-  const handleSave = async (installment: any) => {
-    await saveInstallment(installment)
-    await loadData()
-    setIsFormOpen(false)
-    setEditingInstallment(undefined)
+  const loadData = () => {
+    setInstallments(getInstallments())
+    setClients(getClients())
+    setTaxes(getTaxes())
   }
 
-  const handleDelete = async (id: string) => {
-    if (confirm("Tem certeza que deseja excluir este parcelamento?")) {
-      await deleteInstallment(id)
-      await loadData()
+  const getClientName = (clientId: string) => {
+    return clients.find((c) => c.id === clientId)?.name || "Cliente não encontrado"
+  }
+
+  const getTaxName = (taxId?: string) => {
+    if (!taxId) return "-"
+    return taxes.find((t) => t.id === taxId)?.name || "-"
+  }
+
+  const calculateDueDate = (installment: Installment): Date => {
+    const firstDue = new Date(installment.firstDueDate)
+    const monthsToAdd = installment.currentInstallment - 1
+    const dueDate = new Date(firstDue.getFullYear(), firstDue.getMonth() + monthsToAdd, installment.dueDay)
+    return adjustForWeekend(dueDate, installment.weekendRule)
+  }
+
+  const getStatus = (installment: Installment): "pending" | "in_progress" | "completed" | "overdue" => {
+    if (installment.status === "completed") return "completed"
+    const dueDate = calculateDueDate(installment)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    if (dueDate < today) return "overdue"
+    return installment.status
+  }
+
+  const filteredInstallments = useMemo(() => {
+    return installments.filter((installment) => {
+      const matchesSearch =
+        installment.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        getClientName(installment.clientId).toLowerCase().includes(searchTerm.toLowerCase())
+
+      const status = getStatus(installment)
+      const matchesStatus = statusFilter === "all" || status === statusFilter
+      const matchesClient = clientFilter === "all" || installment.clientId === clientFilter
+
+      return matchesSearch && matchesStatus && matchesClient
+    })
+  }, [installments, searchTerm, statusFilter, clientFilter, clients])
+
+  const statusCounts = useMemo(() => {
+    const counts = {
+      all: installments.length,
+      pending: 0,
+      in_progress: 0,
+      completed: 0,
+      overdue: 0,
     }
-  }
 
-  const handleEdit = (installment: InstallmentWithDetails) => {
-    setEditingInstallment(installment)
+    installments.forEach((installment) => {
+      const status = getStatus(installment)
+      counts[status]++
+    })
+
+    return counts
+  }, [installments])
+
+  const handleEdit = (installment: Installment) => {
+    setSelectedInstallment(installment)
     setIsFormOpen(true)
   }
 
-  const filteredInstallments = installments.filter(installment => {
-    const matchesSearch = installment.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         installment.client.name.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesStatus = statusFilter === "all" || installment.status === statusFilter
-    const matchesClient = clientFilter === "all" || installment.clientId === clientFilter
-    
-    return matchesSearch && matchesStatus && matchesClient
-  })
-
-  const getStatusBadge = (status: string) => {
-    const variants = {
-      pending: "secondary",
-      in_progress: "default",
-      completed: "default",
-      overdue: "destructive"
-    } as const
-
-    const labels = {
-      pending: "Pendente",
-      in_progress: "Em Andamento", 
-      completed: "Concluído",
-      overdue: "Atrasado"
+  const handleDelete = (id: string) => {
+    if (confirm("Tem certeza que deseja excluir este parcelamento?")) {
+      deleteInstallment(id)
+      loadData()
     }
-
-    return (
-      <Badge variant={variants[status as keyof typeof variants] || "secondary"}>
-        {labels[status as keyof typeof labels] || status}
-      </Badge>
-    )
   }
 
-  const isOverdue = (dueDate: string) => {
-    return new Date(dueDate) < new Date()
+  const handleStartInstallment = (installment: Installment) => {
+    const updated = { ...installment, status: "in_progress" as const }
+    saveInstallment(updated)
+    loadData()
+  }
+
+  const handleCompleteInstallment = (installment: Installment) => {
+    const updated = {
+      ...installment,
+      status: "completed" as const,
+      completedAt: new Date().toISOString(),
+    }
+    saveInstallment(updated)
+    loadData()
+  }
+
+  const getStatusBadge = (installment: Installment) => {
+    const status = getStatus(installment)
+    const dueDate = calculateDueDate(installment)
+
+    switch (status) {
+      case "completed":
+        return (
+          <Badge variant="default" className="bg-success text-success-foreground">
+            <CheckCircle2 className="mr-1 h-3 w-3" />
+            Concluída {installment.completedAt && `em ${formatDate(installment.completedAt)}`}
+          </Badge>
+        )
+      case "in_progress":
+        return (
+          <Badge variant="default" className="bg-info text-info-foreground">
+            <Play className="mr-1 h-3 w-3" />
+            Em Andamento
+          </Badge>
+        )
+      case "overdue":
+        return (
+          <Badge variant="destructive">
+            <AlertCircle className="mr-1 h-3 w-3" />
+            Atrasada
+          </Badge>
+        )
+      default:
+        return (
+          <Badge variant="secondary">
+            <AlertCircle className="mr-1 h-3 w-3" />
+            Pendente
+          </Badge>
+        )
+    }
+  }
+
+  const getPriorityIcon = (priority: string) => {
+    switch (priority) {
+      case "urgent":
+        return <Zap className="h-4 w-4 text-destructive" />
+      case "high":
+        return <Flame className="h-4 w-4 text-warning" />
+      case "medium":
+        return <AlertCircle className="h-4 w-4 text-info" />
+      default:
+        return <TrendingUp className="h-4 w-4 text-muted-foreground" />
+    }
   }
 
   return (
     <div className="min-h-screen bg-background">
       <Navigation />
-      <main className="container mx-auto px-4 py-8">
-        <div className="space-y-8">
-          <div className="flex items-center justify-between">
-            <div className="space-y-2">
-              <h1 className="text-4xl font-bold tracking-tight text-balance">Parcelamentos</h1>
-              <p className="text-lg text-muted-foreground">Controle de parcelamentos dos clientes</p>
-            </div>
-            <Button onClick={() => setIsFormOpen(true)}>
-              <Plus className="size-4 mr-2" />
-              Novo Parcelamento
-            </Button>
+      <main className="container mx-auto p-6 space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Parcelamentos</h1>
+            <p className="text-muted-foreground">Gerencie parcelamentos de impostos e obrigações</p>
           </div>
+          <Button
+            onClick={() => {
+              setSelectedInstallment(undefined)
+              setIsFormOpen(true)
+            }}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Novo Parcelamento
+          </Button>
+        </div>
 
-          {/* Filtros */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Filtros</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 sm:grid-cols-3">
-                <div className="grid gap-2">
-                  <label className="text-sm font-medium">Buscar</label>
-                  <Input
-                    placeholder="Descrição ou cliente..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <label className="text-sm font-medium">Status</label>
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos</SelectItem>
-                      <SelectItem value="pending">Pendente</SelectItem>
-                      <SelectItem value="in_progress">Em Andamento</SelectItem>
-                      <SelectItem value="completed">Concluído</SelectItem>
-                      <SelectItem value="overdue">Atrasado</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid gap-2">
-                  <label className="text-sm font-medium">Cliente</label>
-                  <Select value={clientFilter} onValueChange={setClientFilter}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos</SelectItem>
-                      {clients.map((client) => (
-                        <SelectItem key={client.id} value={client.id}>
-                          {client.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        <Tabs value={statusFilter} onValueChange={setStatusFilter} className="w-full">
+          <TabsList className="grid w-full grid-cols-5">
+            <TabsTrigger value="all" className="relative">
+              Todas
+              <Badge variant="secondary" className="ml-2">
+                {statusCounts.all}
+              </Badge>
+            </TabsTrigger>
+            <TabsTrigger value="pending" className="relative">
+              Pendentes
+              <Badge variant="secondary" className="ml-2">
+                {statusCounts.pending}
+              </Badge>
+            </TabsTrigger>
+            <TabsTrigger value="in_progress" className="relative">
+              Em Andamento
+              <Badge variant="secondary" className="ml-2">
+                {statusCounts.in_progress}
+              </Badge>
+            </TabsTrigger>
+            <TabsTrigger value="completed" className="relative">
+              Concluídas
+              <Badge variant="secondary" className="ml-2">
+                {statusCounts.completed}
+              </Badge>
+            </TabsTrigger>
+            <TabsTrigger value="overdue" className="relative">
+              Atrasadas
+              <Badge variant="destructive" className="ml-2">
+                {statusCounts.overdue}
+              </Badge>
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
 
-          {/* Lista de Parcelamentos */}
-          <div className="grid gap-4">
-            {filteredInstallments.length === 0 ? (
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center py-12">
-                  <Calendar className="size-12 text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">Nenhum parcelamento encontrado</h3>
-                  <p className="text-muted-foreground text-center mb-4">
-                    {searchTerm || statusFilter !== "all" || clientFilter !== "all"
-                      ? "Tente ajustar os filtros para encontrar parcelamentos."
-                      : "Comece criando seu primeiro parcelamento."}
-                  </p>
-                  <Button onClick={() => setIsFormOpen(true)}>
-                    <Plus className="size-4 mr-2" />
-                    Novo Parcelamento
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              filteredInstallments.map((installment) => (
-                <Card key={installment.id} className={isOverdue(installment.dueDate) ? "border-red-200" : ""}>
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div className="space-y-1">
-                        <CardTitle className="text-lg">{installment.description}</CardTitle>
-                        <CardDescription className="flex items-center gap-2">
-                          <User className="size-4" />
-                          {installment.client.name}
-                        </CardDescription>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {getStatusBadge(installment.status)}
-                        <div className="flex gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEdit(installment)}
-                          >
-                            <Edit className="size-4" />
+        <div className="flex gap-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Buscar parcelamentos..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          <Select value={clientFilter} onValueChange={setClientFilter}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Filtrar por cliente" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os clientes</SelectItem>
+              {clients.map((client) => (
+                <SelectItem key={client.id} value={client.id}>
+                  {client.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="rounded-lg border bg-card">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nome</TableHead>
+                <TableHead>Cliente</TableHead>
+                <TableHead>Imposto</TableHead>
+                <TableHead>Parcela</TableHead>
+                <TableHead>Valor</TableHead>
+                <TableHead>Vencimento</TableHead>
+                <TableHead>Prioridade</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredInstallments.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={9} className="text-center text-muted-foreground">
+                    Nenhum parcelamento encontrado
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredInstallments.map((installment) => {
+                  const status = getStatus(installment)
+                  const dueDate = calculateDueDate(installment)
+                  return (
+                    <TableRow key={installment.id} className={status === "overdue" ? "bg-destructive/5" : ""}>
+                      <TableCell className="font-medium">{installment.name}</TableCell>
+                      <TableCell>{getClientName(installment.clientId)}</TableCell>
+                      <TableCell>{getTaxName(installment.taxId)}</TableCell>
+                      <TableCell>
+                        {installment.currentInstallment}/{installment.installmentCount}
+                      </TableCell>
+                      <TableCell>
+                        {new Intl.NumberFormat("pt-BR", {
+                          style: "currency",
+                          currency: "BRL",
+                        }).format(installment.installmentAmount)}
+                      </TableCell>
+                      <TableCell>{formatDate(dueDate)}</TableCell>
+                      <TableCell>{getPriorityIcon(installment.priority)}</TableCell>
+                      <TableCell>{getStatusBadge(installment)}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          {status === "pending" && (
+                            <Button size="sm" variant="outline" onClick={() => handleStartInstallment(installment)}>
+                              <Play className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {(status === "pending" || status === "in_progress") && (
+                            <Button size="sm" variant="outline" onClick={() => handleCompleteInstallment(installment)}>
+                              <CheckCircle2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                          <Button size="sm" variant="outline" onClick={() => handleEdit(installment)}>
+                            <Pencil className="h-4 w-4" />
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDelete(installment.id)}
-                          >
-                            <Trash2 className="size-4" />
+                          <Button size="sm" variant="outline" onClick={() => handleDelete(installment.id)}>
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid gap-4 sm:grid-cols-4">
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium text-muted-foreground">Parcela</p>
-                        <p className="text-lg font-semibold">
-                          {installment.installmentNumber} / {installment.totalInstallments}
-                        </p>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium text-muted-foreground">Vencimento</p>
-                        <p className="text-lg font-semibold flex items-center gap-1">
-                          <Calendar className="size-4" />
-                          {formatDate(installment.dueDate)}
-                        </p>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium text-muted-foreground">Valor</p>
-                        <p className="text-lg font-semibold flex items-center gap-1">
-                          <DollarSign className="size-4" />
-                          {formatCurrency(installment.amount)}
-                        </p>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium text-muted-foreground">Progresso</p>
-                        <div className="w-full bg-muted rounded-full h-2">
-                          <div
-                            className="bg-primary h-2 rounded-full"
-                            style={{
-                              width: `${(installment.installmentNumber / installment.totalInstallments) * 100}%`
-                            }}
-                          />
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          {Math.round((installment.installmentNumber / installment.totalInstallments) * 100)}% concluído
-                        </p>
-                      </div>
-                    </div>
-                    {installment.notes && (
-                      <div className="mt-4 pt-4 border-t">
-                        <p className="text-sm text-muted-foreground">{installment.notes}</p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              ))
-            )}
-          </div>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })
+              )}
+            </TableBody>
+          </Table>
         </div>
       </main>
 
       <InstallmentForm
-        installment={editingInstallment}
-        clients={clients}
+        installment={selectedInstallment}
         open={isFormOpen}
-        onOpenChange={(open) => {
-          setIsFormOpen(open)
-          if (!open) setEditingInstallment(undefined)
-        }}
-        onSave={handleSave}
+        onOpenChange={setIsFormOpen}
+        onSave={loadData}
       />
     </div>
   )

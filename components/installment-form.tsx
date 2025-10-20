@@ -1,350 +1,416 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Switch } from "@/components/ui/switch"
-import { Badge } from "@/components/ui/badge"
-import { X, AlertCircle, AlertTriangle, Flag } from "lucide-react"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog"
-import type { Installment, Client, WeekendRule, RecurrenceType } from "@/lib/types"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { getClients, getTaxes, saveInstallment } from "@/lib/storage"
+import type { Installment, Client, Tax, WeekendRule, Priority, RecurrenceType } from "@/lib/types"
+import { AlertCircle, Flame, TrendingUp, Zap } from "lucide-react"
 
-type InstallmentFormProps = {
+interface InstallmentFormProps {
   installment?: Installment
-  clients: Client[]
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSave: (installment: Installment) => void
+  onSave: () => void
 }
 
-export function InstallmentForm({ installment, clients, open, onOpenChange, onSave }: InstallmentFormProps) {
-  const [formData, setFormData] = useState<Partial<Installment>>(
-    installment || {
-      clientId: "",
-      description: "",
-      installmentNumber: 1,
-      totalInstallments: 1,
-      dueDate: "",
-      amount: 0,
-      status: "pending",
-      frequency: "monthly",
-      recurrenceType: "monthly",
-      recurrenceInterval: 1,
-      recurrenceEndDate: undefined,
-      autoGenerate: false,
-      weekendRule: "postpone",
-      notes: "",
-    },
-  )
+export function InstallmentForm({ installment, open, onOpenChange, onSave }: InstallmentFormProps) {
+  const [clients, setClients] = useState<Client[]>([])
+  const [taxes, setTaxes] = useState<Tax[]>([])
+  const [formData, setFormData] = useState<Partial<Installment>>({
+    name: "",
+    description: "",
+    clientId: "",
+    taxId: "",
+    installmentCount: 1,
+    currentInstallment: 1,
+    dueDay: 10,
+    firstDueDate: "",
+    weekendRule: "postpone",
+    status: "pending",
+    priority: "medium",
+    assignedTo: "",
+    protocol: "",
+    notes: "",
+    tags: [],
+    paymentMethod: "",
+    referenceNumber: "",
+    autoGenerate: true,
+    recurrence: "monthly",
+    recurrenceInterval: 1,
+  })
+
+  useEffect(() => {
+    setClients(getClients())
+    setTaxes(getTaxes())
+  }, [])
+
+  useEffect(() => {
+    if (installment) {
+      setFormData(installment)
+    }
+  }, [installment])
+
+  useEffect(() => {
+    // Auto-calculate installment amount
+    if (formData.totalAmount && formData.installmentCount) {
+      const amount = formData.totalAmount / formData.installmentCount
+      setFormData((prev) => ({ ...prev, installmentAmount: Number(amount.toFixed(2)) }))
+    }
+  }, [formData.totalAmount, formData.installmentCount])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+
     const installmentData: Installment = {
       id: installment?.id || crypto.randomUUID(),
+      name: formData.name!,
+      description: formData.description,
       clientId: formData.clientId!,
-      description: formData.description!,
-      installmentNumber: formData.installmentNumber!,
-      totalInstallments: formData.totalInstallments!,
-      dueDate: formData.dueDate!,
-      amount: formData.amount!,
-      status: formData.status || "pending",
-      frequency: formData.frequency!,
-      recurrenceType: formData.recurrenceType!,
-      recurrenceInterval: formData.recurrenceInterval,
-      recurrenceEndDate: formData.recurrenceEndDate,
-      autoGenerate: formData.autoGenerate || false,
+      taxId: formData.taxId || undefined,
+      installmentCount: formData.installmentCount!,
+      currentInstallment: formData.currentInstallment!,
+      dueDay: formData.dueDay!,
+      firstDueDate: formData.firstDueDate!,
       weekendRule: formData.weekendRule!,
-      parentInstallmentId: formData.parentInstallmentId,
-      generatedFor: formData.generatedFor,
+      status: formData.status!,
+      priority: formData.priority!,
+      assignedTo: formData.assignedTo,
+      protocol: formData.protocol,
+      realizationDate: formData.realizationDate,
       notes: formData.notes,
+      createdAt: installment?.createdAt || new Date().toISOString(),
       completedAt: formData.completedAt,
       completedBy: formData.completedBy,
-      createdAt: installment?.createdAt || new Date().toISOString(),
+      history: installment?.history || [],
+      tags: formData.tags || [],
+      paymentMethod: formData.paymentMethod,
+      referenceNumber: formData.referenceNumber,
+      autoGenerate: formData.autoGenerate!,
+      recurrence: formData.recurrence!,
+      recurrenceInterval: formData.recurrenceInterval,
     }
-    onSave(installmentData)
+
+    saveInstallment(installmentData)
+    onSave()
     onOpenChange(false)
   }
 
-  const getPriorityIcon = (status: string) => {
-    switch (status) {
-      case "overdue":
-        return <AlertCircle className="size-4 text-red-600" />
-      case "in_progress":
-        return <AlertTriangle className="size-4 text-orange-600" />
-      case "completed":
-        return <Flag className="size-4 text-green-600" />
-      default:
-        return <Flag className="size-4 text-blue-600" />
-    }
+  const priorityIcons = {
+    low: <TrendingUp className="h-4 w-4" />,
+    medium: <AlertCircle className="h-4 w-4" />,
+    high: <Flame className="h-4 w-4" />,
+    urgent: <Zap className="h-4 w-4" />,
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{installment ? "Editar Parcelamento" : "Novo Parcelamento"}</DialogTitle>
-          <DialogDescription>Configure o parcelamento com todas as regras e vencimentos.</DialogDescription>
+          <DialogDescription>Gerencie parcelamentos de impostos e obrigações fiscais</DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit}>
-          <div className="grid gap-6 py-4">
-            {/* Informações Básicas */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                Informações Básicas
-              </h3>
-
-              <div className="grid gap-2">
-                <Label htmlFor="clientId">Cliente *</Label>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Informações Básicas */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-semibold text-foreground">Informações Básicas</h3>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="name">Nome do Parcelamento *</Label>
+                <Input
+                  id="name"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="client">Cliente *</Label>
                 <Select
                   value={formData.clientId}
                   onValueChange={(value) => setFormData({ ...formData, clientId: value })}
                 >
-                  <SelectTrigger id="clientId">
-                    <SelectValue placeholder="Selecione um cliente" />
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o cliente" />
                   </SelectTrigger>
                   <SelectContent>
                     {clients.map((client) => (
                       <SelectItem key={client.id} value={client.id}>
-                        {client.name} - {client.cnpj}
+                        {client.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
+            </div>
 
-              <div className="grid gap-2">
-                <Label htmlFor="description">Descrição *</Label>
-                <Textarea
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Descreva o parcelamento..."
-                  rows={2}
+            <div className="space-y-2">
+              <Label htmlFor="description">Descrição</Label>
+              <Textarea
+                id="description"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                rows={2}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="tax">Imposto Relacionado</Label>
+              <Select
+                value={formData.taxId || "none"}
+                onValueChange={(value) => setFormData({ ...formData, taxId: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o imposto (opcional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nenhum</SelectItem>
+                  {taxes.map((tax) => (
+                    <SelectItem key={tax.id} value={tax.id}>
+                      {tax.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Controle de Parcelas */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-semibold text-foreground">Controle de Parcelas</h3>
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="space-y-2">
+                <Label htmlFor="installmentCount">Quantidade de Parcelas *</Label>
+                <Input
+                  id="installmentCount"
+                  type="number"
+                  min="1"
+                  value={formData.installmentCount}
+                  onChange={(e) => setFormData({ ...formData, installmentCount: Number.parseInt(e.target.value) })}
                   required
                 />
               </div>
-
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="installmentNumber">Parcela Atual *</Label>
-                  <Input
-                    id="installmentNumber"
-                    type="number"
-                    min="1"
-                    value={formData.installmentNumber || ""}
-                    onChange={(e) => setFormData({ ...formData, installmentNumber: Number(e.target.value) })}
-                    required
-                  />
-                </div>
-
-                <div className="grid gap-2">
-                  <Label htmlFor="totalInstallments">Total de Parcelas *</Label>
-                  <Input
-                    id="totalInstallments"
-                    type="number"
-                    min="1"
-                    value={formData.totalInstallments || ""}
-                    onChange={(e) => setFormData({ ...formData, totalInstallments: Number(e.target.value) })}
-                    required
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Gestão e Controle */}
-            <div className="space-y-4 border-t pt-4">
-              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Gestão e Controle</h3>
-
-              <div className="grid sm:grid-cols-3 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="status" className="flex items-center gap-2">
-                    Status *{getPriorityIcon(formData.status || "pending")}
-                  </Label>
-                  <Select
-                    value={formData.status}
-                    onValueChange={(value) => setFormData({ ...formData, status: value as any })}
-                  >
-                    <SelectTrigger id="status">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="pending">Pendente</SelectItem>
-                      <SelectItem value="in_progress">Em Andamento</SelectItem>
-                      <SelectItem value="completed">Concluído</SelectItem>
-                      <SelectItem value="overdue">Atrasado</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="grid gap-2">
-                  <Label htmlFor="dueDate">Data de Vencimento *</Label>
-                  <Input
-                    id="dueDate"
-                    type="date"
-                    value={formData.dueDate || ""}
-                    onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-                    required
-                  />
-                </div>
-
-                <div className="grid gap-2">
-                  <Label htmlFor="amount">Valor *</Label>
-                  <Input
-                    id="amount"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={formData.amount || ""}
-                    onChange={(e) => setFormData({ ...formData, amount: Number(e.target.value) })}
-                    placeholder="0,00"
-                    required
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Configuração de Recorrência */}
-            <div className="border rounded-lg p-4 space-y-4 bg-muted/30">
-              <h3 className="text-sm font-semibold">Configuração de Recorrência</h3>
-
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="recurrenceType">Tipo de Recorrência *</Label>
-                  <Select
-                    value={formData.recurrenceType}
-                    onValueChange={(value) => setFormData({ ...formData, recurrenceType: value as RecurrenceType })}
-                  >
-                    <SelectTrigger id="recurrenceType">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="monthly">Mensal</SelectItem>
-                      <SelectItem value="bimonthly">Bimestral</SelectItem>
-                      <SelectItem value="quarterly">Trimestral</SelectItem>
-                      <SelectItem value="semiannual">Semestral</SelectItem>
-                      <SelectItem value="annual">Anual</SelectItem>
-                      <SelectItem value="custom">Personalizado</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {formData.recurrenceType === "custom" && (
-                  <div className="grid gap-2">
-                    <Label htmlFor="recurrenceInterval">Intervalo (meses)</Label>
-                    <Input
-                      id="recurrenceInterval"
-                      type="number"
-                      min="1"
-                      value={formData.recurrenceInterval || 1}
-                      onChange={(e) => setFormData({ ...formData, recurrenceInterval: Number(e.target.value) })}
-                    />
-                  </div>
-                )}
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="autoGenerate">Gerar Automaticamente</Label>
-                  <p className="text-xs text-muted-foreground">Criar próximas parcelas automaticamente</p>
-                </div>
-                <Switch
-                  id="autoGenerate"
-                  checked={formData.autoGenerate}
-                  onCheckedChange={(checked) => setFormData({ ...formData, autoGenerate: checked })}
+              <div className="space-y-2">
+                <Label htmlFor="currentInstallment">Parcela Atual *</Label>
+                <Input
+                  id="currentInstallment"
+                  type="number"
+                  min="1"
+                  max={formData.installmentCount}
+                  value={formData.currentInstallment}
+                  onChange={(e) => setFormData({ ...formData, currentInstallment: Number.parseInt(e.target.value) })}
+                  required
                 />
               </div>
-
-              {formData.autoGenerate && (
-                <div className="grid gap-2">
-                  <Label htmlFor="recurrenceEndDate">Data Final (Opcional)</Label>
-                  <Input
-                    id="recurrenceEndDate"
-                    type="date"
-                    value={formData.recurrenceEndDate || ""}
-                    onChange={(e) => setFormData({ ...formData, recurrenceEndDate: e.target.value })}
-                  />
-                  <p className="text-xs text-muted-foreground">Deixe em branco para recorrência indefinida</p>
-                </div>
-              )}
-            </div>
-
-            {/* Vencimentos */}
-            <div className="space-y-4 border-t pt-4">
-              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Vencimentos</h3>
-
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="frequency">Frequência *</Label>
-                  <Select
-                    value={formData.frequency}
-                    onValueChange={(value) => setFormData({ ...formData, frequency: value as any })}
-                  >
-                    <SelectTrigger id="frequency">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="monthly">Mensal</SelectItem>
-                      <SelectItem value="quarterly">Trimestral</SelectItem>
-                      <SelectItem value="annual">Anual</SelectItem>
-                      <SelectItem value="custom">Personalizado</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="grid gap-2">
-                  <Label htmlFor="weekendRule">Regra de Final de Semana *</Label>
-                  <Select
-                    value={formData.weekendRule}
-                    onValueChange={(value) => setFormData({ ...formData, weekendRule: value as WeekendRule })}
-                  >
-                    <SelectTrigger id="weekendRule">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="postpone">Postergar</SelectItem>
-                      <SelectItem value="anticipate">Antecipar</SelectItem>
-                      <SelectItem value="keep">Manter</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </div>
-
-            {/* Informações Adicionais */}
-            <div className="space-y-4 border-t pt-4">
-              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                Informações Adicionais
-              </h3>
-
-              <div className="grid gap-2">
-                <Label htmlFor="notes">Observações</Label>
-                <Textarea
-                  id="notes"
-                  value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  placeholder="Observações adicionais, comentários internos..."
-                  rows={3}
+              <div className="space-y-2">
+                <Label htmlFor="paymentMethod">Forma de Pagamento</Label>
+                <Input
+                  id="paymentMethod"
+                  value={formData.paymentMethod}
+                  onChange={(e) => setFormData({ ...formData, paymentMethod: e.target.value })}
+                  placeholder="Ex: Boleto, Débito Automático"
                 />
               </div>
             </div>
           </div>
-          <DialogFooter>
+
+          {/* Recorrência Automática */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-semibold text-foreground">Recorrência Automática</h3>
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="space-y-2">
+                <Label htmlFor="autoGenerate">Gerar Automaticamente</Label>
+                <Select
+                  value={formData.autoGenerate ? "yes" : "no"}
+                  onValueChange={(value) => setFormData({ ...formData, autoGenerate: value === "yes" })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="yes">Sim</SelectItem>
+                    <SelectItem value="no">Não</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="recurrence">Tipo de Recorrência *</Label>
+                <Select
+                  value={formData.recurrence}
+                  onValueChange={(value: RecurrenceType) => setFormData({ ...formData, recurrence: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="monthly">Mensal</SelectItem>
+                    <SelectItem value="bimonthly">Bimestral</SelectItem>
+                    <SelectItem value="quarterly">Trimestral</SelectItem>
+                    <SelectItem value="semiannual">Semestral</SelectItem>
+                    <SelectItem value="annual">Anual</SelectItem>
+                    <SelectItem value="custom">Personalizado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {formData.recurrence === "custom" && (
+                <div className="space-y-2">
+                  <Label htmlFor="recurrenceInterval">Intervalo (meses)</Label>
+                  <Input
+                    id="recurrenceInterval"
+                    type="number"
+                    min="1"
+                    value={formData.recurrenceInterval}
+                    onChange={(e) => setFormData({ ...formData, recurrenceInterval: Number.parseInt(e.target.value) })}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Vencimentos */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-semibold text-foreground">Vencimentos</h3>
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="space-y-2">
+                <Label htmlFor="firstDueDate">Primeiro Vencimento *</Label>
+                <Input
+                  id="firstDueDate"
+                  type="date"
+                  value={formData.firstDueDate}
+                  onChange={(e) => setFormData({ ...formData, firstDueDate: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="dueDay">Dia de Vencimento *</Label>
+                <Input
+                  id="dueDay"
+                  type="number"
+                  min="1"
+                  max="31"
+                  value={formData.dueDay}
+                  onChange={(e) => setFormData({ ...formData, dueDay: Number.parseInt(e.target.value) })}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="weekendRule">Regra de Final de Semana *</Label>
+                <Select
+                  value={formData.weekendRule}
+                  onValueChange={(value: WeekendRule) => setFormData({ ...formData, weekendRule: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="postpone">Postergar (próximo dia útil)</SelectItem>
+                    <SelectItem value="anticipate">Antecipar (dia útil anterior)</SelectItem>
+                    <SelectItem value="keep">Manter (mesmo dia)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+
+          {/* Gestão e Controle */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-semibold text-foreground">Gestão e Controle</h3>
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="space-y-2">
+                <Label htmlFor="priority">Prioridade *</Label>
+                <Select
+                  value={formData.priority}
+                  onValueChange={(value: Priority) => setFormData({ ...formData, priority: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">
+                      <div className="flex items-center gap-2">
+                        {priorityIcons.low}
+                        <span>Baixa</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="medium">
+                      <div className="flex items-center gap-2">
+                        {priorityIcons.medium}
+                        <span>Média</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="high">
+                      <div className="flex items-center gap-2">
+                        {priorityIcons.high}
+                        <span>Alta</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="urgent">
+                      <div className="flex items-center gap-2">
+                        {priorityIcons.urgent}
+                        <span>Urgente</span>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="assignedTo">Responsável</Label>
+                <Input
+                  id="assignedTo"
+                  value={formData.assignedTo}
+                  onChange={(e) => setFormData({ ...formData, assignedTo: e.target.value })}
+                  placeholder="Nome do responsável"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="protocol">Protocolo/Número</Label>
+                <Input
+                  id="protocol"
+                  value={formData.protocol}
+                  onChange={(e) => setFormData({ ...formData, protocol: e.target.value })}
+                  placeholder="Número do protocolo"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="referenceNumber">Número de Referência</Label>
+              <Input
+                id="referenceNumber"
+                value={formData.referenceNumber}
+                onChange={(e) => setFormData({ ...formData, referenceNumber: e.target.value })}
+                placeholder="Código de barras, linha digitável, etc."
+              />
+            </div>
+          </div>
+
+          {/* Informações Adicionais */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-semibold text-foreground">Informações Adicionais</h3>
+            <div className="space-y-2">
+              <Label htmlFor="notes">Observações</Label>
+              <Textarea
+                id="notes"
+                value={formData.notes}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                rows={3}
+                placeholder="Observações adicionais sobre o parcelamento"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
-            <Button type="submit">Salvar Parcelamento</Button>
-          </DialogFooter>
+            <Button type="submit">Salvar</Button>
+          </div>
         </form>
       </DialogContent>
     </Dialog>

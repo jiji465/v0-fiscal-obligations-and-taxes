@@ -6,34 +6,30 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { ChevronLeft, ChevronRight, CalendarIcon, Filter } from "lucide-react"
-import type { ObligationWithDetails, Tax, Installment, Client } from "@/lib/types"
-import { formatDate, calculateDueDate } from "@/lib/date-utils"
+import { ChevronLeft, ChevronRight, CalendarIcon, Filter, FileText, Receipt, CreditCard } from "lucide-react"
+import type { ObligationWithDetails, InstallmentWithDetails, Tax } from "@/lib/types"
+import { formatDate } from "@/lib/date-utils"
 
-export type CalendarItem = {
+type CalendarItem = {
   id: string
   name: string
-  type: 'obligation' | 'tax' | 'installment'
+  type: "obligation" | "tax" | "installment"
+  clientName: string
   dueDate: string
-  status: 'pending' | 'in_progress' | 'completed' | 'overdue'
-  priority: 'low' | 'medium' | 'high' | 'urgent'
-  client: Client
+  status: string
   description?: string
-  amount?: number
-  installmentInfo?: {
-    installmentNumber: number
-    totalInstallments: number
-  }
+  realizationDate?: string
+  taxName?: string
+  installmentInfo?: string
 }
 
 type CalendarViewProps = {
   obligations: ObligationWithDetails[]
-  taxes?: Tax[]
-  installments?: Installment[]
-  clients: Client[]
+  taxes: Tax[]
+  installments: InstallmentWithDetails[]
 }
 
-export function CalendarView({ obligations, taxes = [], installments = [], clients }: CalendarViewProps) {
+export function CalendarView({ obligations, taxes, installments }: CalendarViewProps) {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [selectedDay, setSelectedDay] = useState<number | null>(null)
   const [filterClient, setFilterClient] = useState<string>("all")
@@ -48,63 +44,48 @@ export function CalendarView({ obligations, taxes = [], installments = [], clien
   const daysInMonth = lastDay.getDate()
   const startingDayOfWeek = firstDay.getDay()
 
-  // Converter todos os tipos para CalendarItem
-  const calendarItems: CalendarItem[] = [
-    // Obrigações
-    ...obligations.map(obl => ({
-      id: obl.id,
-      name: obl.name,
-      type: 'obligation' as const,
-      dueDate: obl.calculatedDueDate,
-      status: obl.status,
-      priority: obl.priority,
-      client: obl.client,
-      description: obl.description,
-      amount: obl.amount
+  const allCalendarItems: CalendarItem[] = [
+    ...obligations.map((o) => ({
+      id: o.id,
+      name: o.name,
+      type: "obligation" as const,
+      clientName: o.client.name,
+      dueDate: o.calculatedDueDate,
+      status: o.status,
+      description: o.description,
+      realizationDate: o.realizationDate,
+      taxName: o.tax?.name,
     })),
-    // Impostos
-    ...taxes.map(tax => {
-      const client = clients.find(c => c.id === tax.clientId)
-      if (!client) return null
-      
-      const dueDate = calculateDueDate(tax.dueDay, tax.dueMonth, undefined, tax.weekendRule)
-      
+    ...taxes.map((t) => ({
+      id: t.id,
+      name: t.name,
+      type: "tax" as const,
+      clientName: "Todos",
+      dueDate: t.dueDay ? new Date(year, month, t.dueDay).toISOString() : new Date(year, month, 10).toISOString(),
+      status: t.status,
+      description: t.description,
+      realizationDate: t.realizationDate,
+    })),
+    ...installments.map((i) => {
+      const firstDue = new Date(i.firstDueDate)
+      const monthsToAdd = i.currentInstallment - 1
+      const dueDate = new Date(firstDue.getFullYear(), firstDue.getMonth() + monthsToAdd, i.dueDay)
       return {
-        id: tax.id,
-        name: tax.name,
-        type: 'tax' as const,
-        dueDate: dueDate.toISOString().split('T')[0],
-        status: tax.status,
-        priority: tax.priority,
-        client,
-        description: tax.description,
-        amount: tax.amount
+        id: i.id,
+        name: i.name,
+        type: "installment" as const,
+        clientName: i.client.name,
+        dueDate: dueDate.toISOString(),
+        status: i.status,
+        description: i.description,
+        realizationDate: i.realizationDate,
+        taxName: i.tax?.name,
+        installmentInfo: `${i.currentInstallment}/${i.installmentCount}`,
       }
-    }).filter(Boolean) as CalendarItem[],
-    // Parcelamentos
-    ...installments.map(inst => {
-      const client = clients.find(c => c.id === inst.clientId)
-      if (!client) return null
-      
-      return {
-        id: inst.id,
-        name: inst.description,
-        type: 'installment' as const,
-        dueDate: inst.dueDate,
-        status: inst.status,
-        priority: 'medium' as const,
-        client,
-        description: inst.description,
-        amount: inst.amount,
-        installmentInfo: {
-          installmentNumber: inst.installmentNumber,
-          totalInstallments: inst.totalInstallments
-        }
-      }
-    }).filter(Boolean) as CalendarItem[]
+    }),
   ]
 
-  const uniqueClients = Array.from(new Set(calendarItems.map((item) => item.client.name))).sort()
+  const uniqueClients = Array.from(new Set(allCalendarItems.map((item) => item.clientName))).sort()
 
   const previousMonth = () => {
     setCurrentDate(new Date(year, month - 1, 1))
@@ -120,10 +101,10 @@ export function CalendarView({ obligations, taxes = [], installments = [], clien
 
   const getItemsForDay = (day: number) => {
     const dateStr = new Date(year, month, day).toISOString().split("T")[0]
-    return calendarItems.filter((item) => {
+    return allCalendarItems.filter((item) => {
       const itemDate = new Date(item.dueDate).toISOString().split("T")[0]
       const matchesDate = itemDate === dateStr
-      const matchesClient = filterClient === "all" || item.client.name === filterClient
+      const matchesClient = filterClient === "all" || item.clientName === filterClient
       const matchesStatus = filterStatus === "all" || item.status === filterStatus
       const matchesType = filterType === "all" || item.type === filterType
       return matchesDate && matchesClient && matchesStatus && matchesType
@@ -157,29 +138,42 @@ export function CalendarView({ obligations, taxes = [], installments = [], clien
 
   const selectedDayItems = selectedDay ? getItemsForDay(selectedDay) : []
 
-  const getTypeColor = (type: string) => {
-    switch (type) {
-      case "tax":
-        return "bg-orange-500/20 text-orange-700 dark:text-orange-300 border-orange-500/30"
-      case "obligation":
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "completed":
+        return "bg-green-500/20 text-green-700 dark:text-green-300 border-green-500/30"
+      case "in_progress":
         return "bg-blue-500/20 text-blue-700 dark:text-blue-300 border-blue-500/30"
-      case "installment":
-        return "bg-purple-500/20 text-purple-700 dark:text-purple-300 border-purple-500/30"
+      case "overdue":
+        return "bg-red-500/20 text-red-700 dark:text-red-300 border-red-500/30"
       default:
-        return "bg-gray-500/20 text-gray-700 dark:text-gray-300 border-gray-500/30"
+        return "bg-yellow-500/20 text-yellow-700 dark:text-yellow-300 border-yellow-500/30"
     }
   }
 
   const getTypeIcon = (type: string) => {
     switch (type) {
-      case "tax":
-        return "💰"
       case "obligation":
-        return "📄"
+        return <FileText className="size-3" />
+      case "tax":
+        return <Receipt className="size-3" />
       case "installment":
-        return "📊"
+        return <CreditCard className="size-3" />
       default:
-        return "📋"
+        return null
+    }
+  }
+
+  const getTypeLabel = (type: string) => {
+    switch (type) {
+      case "obligation":
+        return "Obrigação"
+      case "tax":
+        return "Imposto"
+      case "installment":
+        return "Parcelamento"
+      default:
+        return type
     }
   }
 
@@ -190,7 +184,7 @@ export function CalendarView({ obligations, taxes = [], installments = [], clien
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>Calendário de Vencimentos</CardTitle>
-              <CardDescription>Visualize impostos, obrigações e parcelamentos por data</CardDescription>
+              <CardDescription>Visualize obrigações, impostos e parcelamentos por data</CardDescription>
             </div>
             <CalendarIcon className="size-5 text-muted-foreground" />
           </div>
@@ -213,8 +207,20 @@ export function CalendarView({ obligations, taxes = [], installments = [], clien
                 </Button>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Filter className="size-4 text-muted-foreground" />
+                <Select value={filterType} onValueChange={setFilterType}>
+                  <SelectTrigger className="w-[150px]">
+                    <SelectValue placeholder="Tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os tipos</SelectItem>
+                    <SelectItem value="obligation">Obrigações</SelectItem>
+                    <SelectItem value="tax">Impostos</SelectItem>
+                    <SelectItem value="installment">Parcelamentos</SelectItem>
+                  </SelectContent>
+                </Select>
+
                 <Select value={filterClient} onValueChange={setFilterClient}>
                   <SelectTrigger className="w-[180px]">
                     <SelectValue placeholder="Filtrar por cliente" />
@@ -239,18 +245,6 @@ export function CalendarView({ obligations, taxes = [], installments = [], clien
                     <SelectItem value="in_progress">Em Andamento</SelectItem>
                     <SelectItem value="completed">Concluída</SelectItem>
                     <SelectItem value="overdue">Atrasada</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                <Select value={filterType} onValueChange={setFilterType}>
-                  <SelectTrigger className="w-[150px]">
-                    <SelectValue placeholder="Tipo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos os tipos</SelectItem>
-                    <SelectItem value="tax">💰 Impostos</SelectItem>
-                    <SelectItem value="obligation">📄 Obrigações</SelectItem>
-                    <SelectItem value="installment">📊 Parcelamentos</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -286,16 +280,15 @@ export function CalendarView({ obligations, taxes = [], installments = [], clien
                       {dayItems.slice(0, 3).map((item) => (
                         <div
                           key={item.id}
-                          className={`text-[10px] px-1 py-0.5 rounded truncate border ${getTypeColor(item.type)}`}
-                          title={`${getTypeIcon(item.type)} ${item.name} - ${item.client.name}`}
+                          className={`text-[10px] px-1 py-0.5 rounded truncate border flex items-center gap-1 ${getStatusColor(item.status)}`}
+                          title={`${getTypeLabel(item.type)}: ${item.name} - ${item.clientName}`}
                         >
-                          {getTypeIcon(item.type)} {item.name}
+                          {getTypeIcon(item.type)}
+                          <span className="truncate">{item.name}</span>
                         </div>
                       ))}
                       {dayItems.length > 3 && (
-                        <div className="text-[10px] text-muted-foreground font-medium">
-                          +{dayItems.length - 3} mais
-                        </div>
+                        <div className="text-[10px] text-muted-foreground font-medium">+{dayItems.length - 3} mais</div>
                       )}
                     </div>
                   </button>
@@ -315,16 +308,32 @@ export function CalendarView({ obligations, taxes = [], installments = [], clien
                   <span className="text-muted-foreground">Final de semana</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="size-4 bg-orange-500/20 border border-orange-500/30 rounded" />
-                  <span className="text-muted-foreground">💰 Impostos</span>
+                  <FileText className="size-4" />
+                  <span className="text-muted-foreground">Obrigação</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Receipt className="size-4" />
+                  <span className="text-muted-foreground">Imposto</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CreditCard className="size-4" />
+                  <span className="text-muted-foreground">Parcelamento</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="size-4 bg-yellow-500/20 border border-yellow-500/30 rounded" />
+                  <span className="text-muted-foreground">Pendente</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="size-4 bg-blue-500/20 border border-blue-500/30 rounded" />
-                  <span className="text-muted-foreground">📄 Obrigações</span>
+                  <span className="text-muted-foreground">Em Andamento</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="size-4 bg-purple-500/20 border border-purple-500/30 rounded" />
-                  <span className="text-muted-foreground">📊 Parcelamentos</span>
+                  <div className="size-4 bg-green-500/20 border border-green-500/30 rounded" />
+                  <span className="text-muted-foreground">Concluída</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="size-4 bg-red-500/20 border border-red-500/30 rounded" />
+                  <span className="text-muted-foreground">Atrasada</span>
                 </div>
               </div>
             </div>
@@ -336,22 +345,28 @@ export function CalendarView({ obligations, taxes = [], installments = [], clien
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              Itens de {selectedDay} de {monthNames[month]} de {year}
+              Vencimentos de {selectedDay} de {monthNames[month]} de {year}
             </DialogTitle>
             <DialogDescription>{selectedDayItems.length} item(ns) nesta data</DialogDescription>
           </DialogHeader>
           <div className="space-y-3 mt-4">
             {selectedDayItems.length === 0 ? (
-              <p className="text-center text-muted-foreground py-8">Nenhum item nesta data</p>
+              <p className="text-center text-muted-foreground py-8">Nenhum vencimento nesta data</p>
             ) : (
               selectedDayItems.map((item) => (
                 <div key={item.id} className="border rounded-lg p-4 space-y-2">
                   <div className="flex items-start justify-between">
-                    <div>
-                      <h4 className="font-semibold flex items-center gap-2">
-                        {getTypeIcon(item.type)} {item.name}
-                      </h4>
-                      <p className="text-sm text-muted-foreground">{item.client.name}</p>
+                    <div className="flex items-start gap-2">
+                      {getTypeIcon(item.type)}
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-semibold">{item.name}</h4>
+                          <Badge variant="outline" className="text-xs">
+                            {getTypeLabel(item.type)}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground">{item.clientName}</p>
+                      </div>
                     </div>
                     <Badge
                       className={
@@ -365,28 +380,20 @@ export function CalendarView({ obligations, taxes = [], installments = [], clien
                       }
                     >
                       {item.status === "completed"
-                        ? "Concluído"
+                        ? "Concluída"
                         : item.status === "in_progress"
                           ? "Em Andamento"
                           : item.status === "overdue"
-                            ? "Atrasado"
+                            ? "Atrasada"
                             : "Pendente"}
                     </Badge>
                   </div>
+                  {item.taxName && <p className="text-sm">Imposto: {item.taxName}</p>}
+                  {item.installmentInfo && <p className="text-sm">Parcela: {item.installmentInfo}</p>}
                   {item.description && <p className="text-sm text-muted-foreground">{item.description}</p>}
-                  {item.installmentInfo && (
-                    <p className="text-sm">
-                      Parcela {item.installmentInfo.installmentNumber} de {item.installmentInfo.totalInstallments}
-                    </p>
-                  )}
-                  {item.amount && (
-                    <p className="text-sm font-medium">
-                      Valor: R$ {item.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </p>
-                  )}
                   <div className="flex gap-4 text-xs text-muted-foreground">
-                    <span>Tipo: {item.type === 'tax' ? 'Imposto' : item.type === 'obligation' ? 'Obrigação' : 'Parcelamento'}</span>
                     <span>Vencimento: {formatDate(item.dueDate)}</span>
+                    {item.realizationDate && <span>Realizada: {formatDate(item.realizationDate)}</span>}
                   </div>
                 </div>
               ))

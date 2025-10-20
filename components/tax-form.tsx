@@ -18,34 +18,28 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog"
-import type { Tax, Client, WeekendRule, RecurrenceType } from "@/lib/types"
+import type { Tax } from "@/lib/types"
 
 type TaxFormProps = {
   tax?: Tax
-  clients: Client[]
   open: boolean
   onOpenChange: (open: boolean) => void
   onSave: (tax: Tax) => void
 }
 
-export function TaxForm({ tax, clients, open, onOpenChange, onSave }: TaxFormProps) {
+export function TaxForm({ tax, open, onOpenChange, onSave }: TaxFormProps) {
   const [formData, setFormData] = useState<Partial<Tax>>(
     tax || {
-      clientId: "",
       name: "",
       description: "",
       federalTaxCode: "",
-      dueDay: 1,
-      dueMonth: undefined,
-      frequency: "monthly",
-      recurrenceType: "monthly",
-      recurrenceInterval: 1,
-      recurrenceEndDate: undefined,
-      autoGenerate: false,
-      weekendRule: "postpone",
-      amount: undefined,
+      dueDay: undefined,
       status: "pending",
       priority: "medium",
+      recurrence: "monthly",
+      recurrenceInterval: 1,
+      autoGenerate: false,
+      weekendRule: "postpone",
       assignedTo: "",
       protocol: "",
       notes: "",
@@ -59,21 +53,17 @@ export function TaxForm({ tax, clients, open, onOpenChange, onSave }: TaxFormPro
     e.preventDefault()
     const taxData: Tax = {
       id: tax?.id || crypto.randomUUID(),
-      clientId: formData.clientId!,
       name: formData.name!,
       description: formData.description!,
       federalTaxCode: formData.federalTaxCode,
-      dueDay: formData.dueDay!,
-      dueMonth: formData.dueMonth,
-      frequency: formData.frequency!,
-      recurrenceType: formData.recurrenceType!,
+      dueDay: formData.dueDay ? Number(formData.dueDay) : undefined,
+      status: formData.status || "pending",
+      priority: formData.priority || "medium",
+      recurrence: formData.recurrence as any,
       recurrenceInterval: formData.recurrenceInterval,
       recurrenceEndDate: formData.recurrenceEndDate,
       autoGenerate: formData.autoGenerate || false,
-      weekendRule: formData.weekendRule!,
-      amount: formData.amount,
-      status: formData.status || "pending",
-      priority: formData.priority || "medium",
+      weekendRule: formData.weekendRule as "postpone" | "anticipate" | "keep",
       assignedTo: formData.assignedTo,
       protocol: formData.protocol,
       notes: formData.notes,
@@ -124,25 +114,6 @@ export function TaxForm({ tax, clients, open, onOpenChange, onSave }: TaxFormPro
               <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
                 Informações Básicas
               </h3>
-
-              <div className="grid gap-2">
-                <Label htmlFor="clientId">Cliente *</Label>
-                <Select
-                  value={formData.clientId}
-                  onValueChange={(value) => setFormData({ ...formData, clientId: value })}
-                >
-                  <SelectTrigger id="clientId">
-                    <SelectValue placeholder="Selecione um cliente" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {clients.map((client) => (
-                      <SelectItem key={client.id} value={client.id}>
-                        {client.name} - {client.cnpj}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
 
               <div className="grid gap-2">
                 <Label htmlFor="name">Nome do Imposto *</Label>
@@ -248,12 +219,12 @@ export function TaxForm({ tax, clients, open, onOpenChange, onSave }: TaxFormPro
 
               <div className="grid sm:grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="recurrenceType">Tipo de Recorrência *</Label>
+                  <Label htmlFor="recurrence">Tipo de Recorrência *</Label>
                   <Select
-                    value={formData.recurrenceType}
-                    onValueChange={(value) => setFormData({ ...formData, recurrenceType: value as RecurrenceType })}
+                    value={formData.recurrence}
+                    onValueChange={(value) => setFormData({ ...formData, recurrence: value as any })}
                   >
-                    <SelectTrigger id="recurrenceType">
+                    <SelectTrigger id="recurrence">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -267,7 +238,7 @@ export function TaxForm({ tax, clients, open, onOpenChange, onSave }: TaxFormPro
                   </Select>
                 </div>
 
-                {formData.recurrenceType === "custom" && (
+                {formData.recurrence === "custom" && (
                   <div className="grid gap-2">
                     <Label htmlFor="recurrenceInterval">Intervalo (meses)</Label>
                     <Input
@@ -311,9 +282,9 @@ export function TaxForm({ tax, clients, open, onOpenChange, onSave }: TaxFormPro
             <div className="space-y-4 border-t pt-4">
               <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Vencimentos</h3>
 
-              <div className="grid sm:grid-cols-3 gap-4">
+              <div className="grid sm:grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="dueDay">Dia do Vencimento *</Label>
+                  <Label htmlFor="dueDay">Dia do Vencimento (Opcional)</Label>
                   <Input
                     id="dueDay"
                     type="number"
@@ -321,45 +292,20 @@ export function TaxForm({ tax, clients, open, onOpenChange, onSave }: TaxFormPro
                     max="31"
                     value={formData.dueDay || ""}
                     onChange={(e) =>
-                      setFormData({ ...formData, dueDay: e.target.value ? Number(e.target.value) : 1 })
+                      setFormData({ ...formData, dueDay: e.target.value ? Number(e.target.value) : undefined })
                     }
                     placeholder="Ex: 15"
-                    required
                   />
-                </div>
-
-                <div className="grid gap-2">
-                  <Label htmlFor="dueMonth">Mês Específico (Opcional)</Label>
-                  <Select
-                    value={formData.dueMonth?.toString() || ""}
-                    onValueChange={(value) => setFormData({ ...formData, dueMonth: value ? Number(value) : undefined })}
-                  >
-                    <SelectTrigger id="dueMonth">
-                      <SelectValue placeholder="Qualquer mês" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">Qualquer mês</SelectItem>
-                      <SelectItem value="1">Janeiro</SelectItem>
-                      <SelectItem value="2">Fevereiro</SelectItem>
-                      <SelectItem value="3">Março</SelectItem>
-                      <SelectItem value="4">Abril</SelectItem>
-                      <SelectItem value="5">Maio</SelectItem>
-                      <SelectItem value="6">Junho</SelectItem>
-                      <SelectItem value="7">Julho</SelectItem>
-                      <SelectItem value="8">Agosto</SelectItem>
-                      <SelectItem value="9">Setembro</SelectItem>
-                      <SelectItem value="10">Outubro</SelectItem>
-                      <SelectItem value="11">Novembro</SelectItem>
-                      <SelectItem value="12">Dezembro</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Dia padrão de vencimento (pode ser sobrescrito na obrigação)
+                  </p>
                 </div>
 
                 <div className="grid gap-2">
                   <Label htmlFor="weekendRule">Regra de Final de Semana *</Label>
                   <Select
                     value={formData.weekendRule}
-                    onValueChange={(value) => setFormData({ ...formData, weekendRule: value as WeekendRule })}
+                    onValueChange={(value) => setFormData({ ...formData, weekendRule: value as any })}
                   >
                     <SelectTrigger id="weekendRule">
                       <SelectValue />
@@ -370,41 +316,6 @@ export function TaxForm({ tax, clients, open, onOpenChange, onSave }: TaxFormPro
                       <SelectItem value="keep">Manter</SelectItem>
                     </SelectContent>
                   </Select>
-                </div>
-              </div>
-
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="frequency">Frequência *</Label>
-                  <Select
-                    value={formData.frequency}
-                    onValueChange={(value) => setFormData({ ...formData, frequency: value as any })}
-                  >
-                    <SelectTrigger id="frequency">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="monthly">Mensal</SelectItem>
-                      <SelectItem value="quarterly">Trimestral</SelectItem>
-                      <SelectItem value="annual">Anual</SelectItem>
-                      <SelectItem value="custom">Personalizado</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="grid gap-2">
-                  <Label htmlFor="amount">Valor (Opcional)</Label>
-                  <Input
-                    id="amount"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={formData.amount || ""}
-                    onChange={(e) =>
-                      setFormData({ ...formData, amount: e.target.value ? Number(e.target.value) : undefined })
-                    }
-                    placeholder="0,00"
-                  />
                 </div>
               </div>
             </div>
