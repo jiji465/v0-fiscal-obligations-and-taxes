@@ -11,7 +11,7 @@ export type Client = {
 export type Tax = {
   id: string
   name: string
-  description: string
+  description?: string
   federalTaxCode?: string
   dueDay?: number // Dia do vencimento do imposto (1-31)
   status: "pending" | "in_progress" | "completed" | "overdue"
@@ -24,6 +24,12 @@ export type Tax = {
   completedBy?: string
   history?: ObligationHistory[]
   tags?: string[]
+  recurrence?: RecurrenceType
+  recurrenceInterval?: number
+  recurrenceEndDate?: string
+  autoGenerate?: boolean
+  weekendRule?: WeekendRule
+  // </CHANGE>
   createdAt: string
 }
 
