@@ -14,7 +14,7 @@ export type Tax = {
   description?: string
   federalTaxCode?: string
   dueDay?: number // Dia do vencimento do imposto (1-31)
-  status: "pending" | "in_progress" | "completed" | "overdue"
+  status: "pending" | "in_progress" | "completed" | "overdue" | "template" // Adicionado status "template"
   priority: Priority
   assignedTo?: string
   protocol?: string
@@ -29,7 +29,23 @@ export type Tax = {
   recurrenceEndDate?: string
   autoGenerate?: boolean
   weekendRule?: WeekendRule
-  // </CHANGE>
+  createdAt: string
+}
+
+export type TaxOccurrence = {
+  id: string
+  taxId: string
+  dueDate: string
+  amount?: number
+  status: "pending" | "in_progress" | "completed" | "overdue"
+  priority: Priority
+  assignedTo?: string
+  protocol?: string
+  realizationDate?: string
+  notes?: string
+  completedAt?: string
+  completedBy?: string
+  tags?: string[]
   createdAt: string
 }
 
@@ -85,6 +101,7 @@ export type Obligation = {
   parentObligationId?: string // ID da obrigação original que gerou esta
   generatedFor?: string // Período para qual foi gerada (ex: "2025-01")
   tags?: string[]
+  amount?: number // Valor da obrigação
 }
 
 export type Installment = {
@@ -114,6 +131,7 @@ export type Installment = {
   autoGenerate: boolean
   recurrence: RecurrenceType
   recurrenceInterval?: number
+  installmentAmount?: number // Valor da parcela
 }
 
 export type ObligationHistory = {

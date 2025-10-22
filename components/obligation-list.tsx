@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -22,55 +22,95 @@ import {
   AlertTriangle,
   ArrowUpDown,
   Clock,
+  Loader2,
 } from "lucide-react"
 import type { ObligationWithDetails, Client, Tax } from "@/lib/types"
 import { saveObligation, deleteObligation } from "@/lib/supabase/database"
 import { formatDate, isOverdue } from "@/lib/date-utils"
 import { getRecurrenceDescription } from "@/lib/recurrence-utils"
+import { getFilteredObligations } from "@/lib/server-actions"
+import type { ObligationFilters } from "@/lib/supabase/database"
 
 type ObligationListProps = {
-  obligations: ObligationWithDetails[]
+  initialObligations: ObligationWithDetails[]
   clients: Client[]
   taxes: Tax[]
   onUpdate: () => void
 }
 
-export function ObligationList({ obligations, clients, taxes, onUpdate }: ObligationListProps) {
+export function ObligationList({ initialObligations, clients, taxes, onUpdate }: ObligationListProps) {
+  const [obligations, setObligations] = useState<ObligationWithDetails[]>(initialObligations)
   const [search, setSearch] = useState("")
   const [clientFilter, setClientFilter] = useState<string>("all")
+  const [statusFilter, setStatusFilter] = useState<string>("all")
+  const [priorityFilter, setPriorityFilter] = useState<string>("all")
   const [editingObligation, setEditingObligation] = useState<ObligationWithDetails | undefined>()
   const [viewingObligation, setViewingObligation] = useState<ObligationWithDetails | undefined>()
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [isDetailsOpen, setIsDetailsOpen] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
-  const [sortBy, setSortBy] = useState<"dueDate" | "client" | "status">("dueDate")
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc")
+  const [sortBy, setSortBy] = useState<"dueDay" | "client" | "status" | "createdAt">("createdAt")
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc")
+  const [isLoading, setIsLoading] = useState(false)
+  const [totalCount, setTotalCount] = useState(0)
+  const [currentPage, setCurrentPage] = useState(0)
+  const [hasMore, setHasMore] = useState(false)
 
-  const filteredObligations = obligations.filter((obl) => {
-    const matchesSearch =
-      obl.name.toLowerCase().includes(search.toLowerCase()) ||
-      obl.client.name.toLowerCase().includes(search.toLowerCase()) ||
-      obl.tax?.name.toLowerCase().includes(search.toLowerCase())
+  const ITEMS_PER_PAGE = 20
 
-    const matchesClient = clientFilter === "all" || obl.clientId === clientFilter
+  // Debounced search effect
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      fetchFilteredObligations()
+    }, 300)
 
-    return matchesSearch && matchesClient
-  })
+    return () => clearTimeout(timeoutId)
+  }, [search, clientFilter, statusFilter, priorityFilter, sortBy, sortOrder])
 
-  const sortedObligations = [...filteredObligations].sort((a, b) => {
-    let comparison = 0
+  const fetchFilteredObligations = useCallback(async () => {
+    setIsLoading(true)
+    try {
+      const filters: ObligationFilters = {
+        search: search || undefined,
+        clientId: clientFilter !== "all" ? clientFilter : undefined,
+        status: statusFilter !== "all" ? statusFilter : undefined,
+        priority: priorityFilter !== "all" ? priorityFilter : undefined,
+        sortBy,
+        sortOrder,
+        limit: ITEMS_PER_PAGE,
+        offset: currentPage * ITEMS_PER_PAGE
+      }
 
-    if (sortBy === "dueDate") {
-      comparison = new Date(a.calculatedDueDate).getTime() - new Date(b.calculatedDueDate).getTime()
-    } else if (sortBy === "client") {
-      comparison = a.client.name.localeCompare(b.client.name)
-    } else if (sortBy === "status") {
-      const statusOrder = { overdue: 0, pending: 1, in_progress: 2, completed: 3 }
-      comparison = statusOrder[a.status] - statusOrder[b.status]
+      const result = await getFilteredObligations(filters)
+      setObligations(result.obligations)
+      setTotalCount(result.totalCount)
+      setHasMore(result.hasMore)
+    } catch (error) {
+      console.error("Error fetching filtered obligations:", error)
+    } finally {
+      setIsLoading(false)
     }
+  }, [search, clientFilter, statusFilter, priorityFilter, sortBy, sortOrder, currentPage])
 
-    return sortOrder === "asc" ? comparison : -comparison
-  })
+  const handleSearchChange = (value: string) => {
+    setSearch(value)
+    setCurrentPage(0) // Reset to first page when searching
+  }
+
+  const handleFilterChange = (filterType: string, value: string) => {
+    switch (filterType) {
+      case 'client':
+        setClientFilter(value)
+        break
+      case 'status':
+        setStatusFilter(value)
+        break
+      case 'priority':
+        setPriorityFilter(value)
+        break
+    }
+    setCurrentPage(0) // Reset to first page when filtering
+  }
 
   const handleSave = (obligation: any) => {
     saveObligation(obligation)
@@ -199,13 +239,17 @@ export function ObligationList({ obligations, clients, taxes, onUpdate }: Obliga
     )
   }
 
-  const toggleSort = (field: "dueDate" | "client" | "status") => {
+  const toggleSort = (field: "dueDay" | "client" | "status" | "createdAt") => {
     if (sortBy === field) {
       setSortOrder(sortOrder === "asc" ? "desc" : "asc")
     } else {
       setSortBy(field)
       setSortOrder("asc")
     }
+  }
+
+  const handlePageChange = (newPage: number) => {
+    setCurrentPage(newPage)
   }
 
   const QuickActionButtons = ({ obligation }: { obligation: ObligationWithDetails }) => {
@@ -242,17 +286,20 @@ export function ObligationList({ obligations, clients, taxes, onUpdate }: Obliga
           <Input
             placeholder="Buscar obrigações..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="pl-9"
           />
+          {isLoading && (
+            <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 size-4 animate-spin text-muted-foreground" />
+          )}
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => setShowFilters(!showFilters)}>
             <Filter className="size-4 mr-2" />
             Filtros
-            {clientFilter !== "all" && (
+            {(clientFilter !== "all" || statusFilter !== "all" || priorityFilter !== "all") && (
               <Badge variant="secondary" className="ml-2 size-5 rounded-full p-0 flex items-center justify-center">
-                1
+                {[clientFilter, statusFilter, priorityFilter].filter(f => f !== "all").length}
               </Badge>
             )}
           </Button>
@@ -264,10 +311,10 @@ export function ObligationList({ obligations, clients, taxes, onUpdate }: Obliga
       </div>
 
       {showFilters && (
-        <div className="grid sm:grid-cols-2 gap-4 p-4 border rounded-lg bg-muted/50">
+        <div className="grid sm:grid-cols-3 gap-4 p-4 border rounded-lg bg-muted/50">
           <div className="grid gap-2">
             <label className="text-sm font-medium">Cliente</label>
-            <Select value={clientFilter} onValueChange={setClientFilter}>
+            <Select value={clientFilter} onValueChange={(value) => handleFilterChange('client', value)}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -278,6 +325,36 @@ export function ObligationList({ obligations, clients, taxes, onUpdate }: Obliga
                     {client.name}
                   </SelectItem>
                 ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-2">
+            <label className="text-sm font-medium">Status</label>
+            <Select value={statusFilter} onValueChange={(value) => handleFilterChange('status', value)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os status</SelectItem>
+                <SelectItem value="pending">Pendente</SelectItem>
+                <SelectItem value="in_progress">Em Andamento</SelectItem>
+                <SelectItem value="completed">Concluída</SelectItem>
+                <SelectItem value="overdue">Atrasada</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-2">
+            <label className="text-sm font-medium">Prioridade</label>
+            <Select value={priorityFilter} onValueChange={(value) => handleFilterChange('priority', value)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as prioridades</SelectItem>
+                <SelectItem value="low">Baixa</SelectItem>
+                <SelectItem value="medium">Média</SelectItem>
+                <SelectItem value="high">Alta</SelectItem>
+                <SelectItem value="urgent">Urgente</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -303,7 +380,7 @@ export function ObligationList({ obligations, clients, taxes, onUpdate }: Obliga
                 </Button>
               </TableHead>
               <TableHead>
-                <Button variant="ghost" size="sm" onClick={() => toggleSort("dueDate")} className="-ml-3">
+                <Button variant="ghost" size="sm" onClick={() => toggleSort("dueDay")} className="-ml-3">
                   Vencimento
                   <ArrowUpDown className="ml-2 size-3" />
                 </Button>
@@ -313,14 +390,23 @@ export function ObligationList({ obligations, clients, taxes, onUpdate }: Obliga
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sortedObligations.length === 0 ? (
+            {isLoading ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                  <div className="flex items-center justify-center gap-2">
+                    <Loader2 className="size-4 animate-spin" />
+                    Carregando obrigações...
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : obligations.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                   Nenhuma obrigação encontrada
                 </TableCell>
               </TableRow>
             ) : (
-              sortedObligations.map((obligation) => (
+              obligations.map((obligation) => (
                 <TableRow
                   key={obligation.id}
                   className={
@@ -416,6 +502,33 @@ export function ObligationList({ obligations, clients, taxes, onUpdate }: Obliga
           </TableBody>
         </Table>
       </div>
+
+      {/* Pagination */}
+      {totalCount > ITEMS_PER_PAGE && (
+        <div className="flex items-center justify-between">
+          <div className="text-sm text-muted-foreground">
+            Mostrando {currentPage * ITEMS_PER_PAGE + 1} a {Math.min((currentPage + 1) * ITEMS_PER_PAGE, totalCount)} de {totalCount} obrigações
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={currentPage === 0 || isLoading}
+            >
+              Anterior
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={!hasMore || isLoading}
+            >
+              Próxima
+            </Button>
+          </div>
+        </div>
+      )}
 
       <ObligationForm
         obligation={editingObligation}

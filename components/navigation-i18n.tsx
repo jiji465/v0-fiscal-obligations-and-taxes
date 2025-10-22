@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useTranslations } from 'next-intl'
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { LayoutDashboard, Users, FileText, Calendar, Receipt, Menu, X, BarChart3, Bell, CreditCard } from "lucide-react"
@@ -11,7 +12,8 @@ import { getObligationsWithDetails } from "@/lib/dashboard-utils"
 import { isOverdue } from "@/lib/date-utils"
 import { getObligations, getClients, getTaxes } from "@/lib/supabase/database"
 
-export function Navigation() {
+export function NavigationI18n() {
+  const t = useTranslations('navigation')
   const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [alertCounts, setAlertCounts] = useState({
@@ -53,29 +55,29 @@ export function Navigation() {
   const navItems = [
     {
       href: "/",
-      label: "Dashboard",
+      label: t('dashboard'),
       icon: LayoutDashboard,
       badge: alertCounts.overdue > 0 ? alertCounts.overdue : null,
       badgeVariant: "destructive" as const,
     },
-    { href: "/clientes", label: "Clientes", icon: Users },
-    { href: "/impostos", label: "Impostos", icon: Receipt },
+    { href: "/clientes", label: t('clients'), icon: Users },
+    { href: "/impostos", label: t('taxes'), icon: Receipt },
     {
       href: "/obrigacoes",
-      label: "Obrigações",
+      label: t('obligations'),
       icon: FileText,
       badge: alertCounts.pending > 0 ? alertCounts.pending : null,
       badgeVariant: "secondary" as const,
     },
-    { href: "/parcelamentos", label: "Parcelamentos", icon: CreditCard },
+    { href: "/parcelamentos", label: t('installments'), icon: CreditCard },
     {
       href: "/calendario",
-      label: "Calendário",
+      label: t('calendar'),
       icon: Calendar,
       badge: alertCounts.thisWeek > 0 ? alertCounts.thisWeek : null,
       badgeVariant: "default" as const,
     },
-    { href: "/relatorios", label: "Relatórios", icon: BarChart3 },
+    { href: "/relatorios", label: t('reports'), icon: BarChart3 },
   ]
 
   const totalAlerts = alertCounts.overdue + alertCounts.thisWeek
@@ -121,7 +123,7 @@ export function Navigation() {
               <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-red-50 dark:bg-red-950/20 rounded-full border border-red-200 dark:border-red-800">
                 <Bell className="size-4 text-red-600 dark:text-red-400" />
                 <span className="text-sm font-medium text-red-700 dark:text-red-300">
-                  {totalAlerts} {totalAlerts === 1 ? "alerta" : "alertas"}
+                  {totalAlerts} {totalAlerts === 1 ? t('alert') : t('alerts')}
                 </span>
               </div>
             )}

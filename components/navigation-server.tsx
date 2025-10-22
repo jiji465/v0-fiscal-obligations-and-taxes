@@ -1,55 +1,18 @@
-"use client"
-
-import { useState, useEffect } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { LayoutDashboard, Users, FileText, Calendar, Receipt, Menu, X, BarChart3, Bell, CreditCard } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { getObligationsWithDetails } from "@/lib/dashboard-utils"
-import { isOverdue } from "@/lib/date-utils"
-import { getObligations, getClients, getTaxes } from "@/lib/supabase/database"
 
-export function Navigation() {
-  const pathname = usePathname()
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [alertCounts, setAlertCounts] = useState({
-    overdue: 0,
-    pending: 0,
-    thisWeek: 0,
-  })
+type NavigationServerProps = {
+  alertCounts?: {
+    overdue: number
+    pending: number
+    thisWeek: number
+  }
+}
 
-  useEffect(() => {
-    const loadAlertCounts = async () => {
-      try {
-        const [obligationsData, clientsData, taxesData] = await Promise.all([
-          getObligations(),
-          getClients(),
-          getTaxes()
-        ])
-
-        const obligations = getObligationsWithDetails(obligationsData, clientsData, taxesData)
-        const overdue = obligations.filter((o) => isOverdue(o.calculatedDueDate) && o.status !== "completed").length
-        const pending = obligations.filter((o) => o.status === "pending").length
-
-        const today = new Date()
-        const nextWeek = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)
-        const thisWeek = obligations.filter((o) => {
-          const dueDate = new Date(o.calculatedDueDate)
-          return dueDate >= today && dueDate <= nextWeek && o.status !== "completed"
-        }).length
-
-        setAlertCounts({ overdue, pending, thisWeek })
-      } catch (error) {
-        console.error("Erro ao carregar contadores de alerta:", error)
-        setAlertCounts({ overdue: 0, pending: 0, thisWeek: 0 })
-      }
-    }
-
-    loadAlertCounts()
-  }, [pathname])
-
+export function NavigationServer({ alertCounts = { overdue: 0, pending: 0, thisWeek: 0 } }: NavigationServerProps) {
   const navItems = [
     {
       href: "/",
@@ -95,12 +58,11 @@ export function Navigation() {
             <div className="hidden md:flex items-center gap-1">
               {navItems.map((item) => {
                 const Icon = item.icon
-                const isActive = pathname === item.href
                 return (
                   <Link key={item.href} href={item.href}>
                     <Button
-                      variant={isActive ? "secondary" : "ghost"}
-                      className={cn("gap-2 relative transition-all", isActive && "bg-secondary shadow-sm")}
+                      variant="ghost"
+                      className="gap-2 relative transition-all"
                     >
                       <Icon className="size-4" />
                       {item.label}
@@ -130,9 +92,8 @@ export function Navigation() {
               variant="ghost"
               size="icon"
               className="md:hidden relative"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             >
-              {mobileMenuOpen ? <X className="size-5" /> : <Menu className="size-5" />}
+              <Menu className="size-5" />
               {totalAlerts > 0 && (
                 <Badge variant="destructive" className="absolute -top-1 -right-1 h-5 min-w-5 px-1 text-xs">
                   {totalAlerts}
@@ -141,28 +102,6 @@ export function Navigation() {
             </Button>
           </div>
         </div>
-
-        {mobileMenuOpen && (
-          <div className="md:hidden py-4 space-y-1 animate-in slide-in-from-top-2">
-            {navItems.map((item) => {
-              const Icon = item.icon
-              const isActive = pathname === item.href
-              return (
-                <Link key={item.href} href={item.href} onClick={() => setMobileMenuOpen(false)}>
-                  <Button variant={isActive ? "secondary" : "ghost"} className="w-full justify-start gap-2">
-                    <Icon className="size-4" />
-                    {item.label}
-                    {item.badge && (
-                      <Badge variant={item.badgeVariant} className="ml-auto h-5 min-w-5 px-1 text-xs">
-                        {item.badge}
-                      </Badge>
-                    )}
-                  </Button>
-                </Link>
-              )
-            })}
-          </div>
-        )}
       </div>
     </nav>
   )

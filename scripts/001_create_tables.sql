@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS public.obligations (
   parent_obligation_id UUID REFERENCES public.obligations(id) ON DELETE SET NULL,
   generated_for TEXT,
   tags TEXT[],
+  amount DECIMAL(10,2),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -85,6 +86,25 @@ CREATE TABLE IF NOT EXISTS public.installments (
   auto_generate BOOLEAN NOT NULL DEFAULT true,
   recurrence TEXT NOT NULL DEFAULT 'monthly' CHECK (recurrence IN ('monthly', 'bimonthly', 'quarterly', 'semiannual', 'annual', 'custom')),
   recurrence_interval INTEGER,
+  installment_amount DECIMAL(10,2),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Tabela de Ocorrências de Impostos
+CREATE TABLE IF NOT EXISTS public.tax_occurrences (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tax_id UUID NOT NULL REFERENCES public.taxes(id) ON DELETE CASCADE,
+  due_date DATE NOT NULL,
+  amount DECIMAL(10,2),
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'in_progress', 'completed', 'overdue')),
+  priority TEXT NOT NULL DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high', 'urgent')),
+  assigned_to TEXT,
+  protocol TEXT,
+  realization_date TIMESTAMPTZ,
+  notes TEXT,
+  completed_at TIMESTAMPTZ,
+  completed_by TEXT,
+  tags TEXT[],
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -107,11 +127,15 @@ CREATE INDEX IF NOT EXISTS idx_obligations_parent_id ON public.obligations(paren
 CREATE INDEX IF NOT EXISTS idx_installments_client_id ON public.installments(client_id);
 CREATE INDEX IF NOT EXISTS idx_installments_tax_id ON public.installments(tax_id);
 CREATE INDEX IF NOT EXISTS idx_installments_status ON public.installments(status);
+CREATE INDEX IF NOT EXISTS idx_tax_occurrences_tax_id ON public.tax_occurrences(tax_id);
+CREATE INDEX IF NOT EXISTS idx_tax_occurrences_due_date ON public.tax_occurrences(due_date);
+CREATE INDEX IF NOT EXISTS idx_tax_occurrences_status ON public.tax_occurrences(status);
 CREATE INDEX IF NOT EXISTS idx_history_entity ON public.history(entity_type, entity_id);
 
 -- Comentários nas tabelas
 COMMENT ON TABLE public.clients IS 'Clientes da contabilidade';
-COMMENT ON TABLE public.taxes IS 'Impostos e tributos';
+COMMENT ON TABLE public.taxes IS 'Impostos e tributos (templates)';
 COMMENT ON TABLE public.obligations IS 'Obrigações acessórias fiscais';
 COMMENT ON TABLE public.installments IS 'Parcelamentos de impostos e obrigações';
+COMMENT ON TABLE public.tax_occurrences IS 'Ocorrências específicas de impostos (geradas automaticamente)';
 COMMENT ON TABLE public.history IS 'Histórico de ações em todas as entidades';

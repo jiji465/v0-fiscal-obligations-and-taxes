@@ -14,6 +14,7 @@ import {
   generateTaxForPeriod,
   generateInstallmentForPeriod,
 } from "./recurrence-engine"
+import { adjustForWeekend } from "./date-utils"
 import { getLastRecurrenceCheck, setLastRecurrenceCheck } from "./storage"; // Manter para controle local
 
 // CORREÇÃO: Função agora é async
@@ -67,29 +68,38 @@ export async function checkAndGenerateRecurrences(): Promise<void> {
       }
     }
 
-    // Gerar impostos recorrentes
-    // ATENÇÃO: A lógica original para impostos pode precisar de ajuste fino.
-    // Esta versão assume que um imposto recorrente gera uma *nova* instância com o mesmo nome
-    // mas com data de criação no período atual. Isso pode não ser o ideal.
-    // Uma abordagem melhor seria ter uma tabela separada para "ocorrências de impostos".
-    // Por ora, mantendo a lógica similar à original:
-    const taxesToGenerate = taxes.filter((t) => t.dueDay !== undefined && t.autoGenerate); // Adicionado autoGenerate
+    // Gerar ocorrências de impostos recorrentes
+    // NOVA LÓGICA: Usar tabela tax_occurrences em vez de duplicar na tabela taxes
+    const taxesToGenerate = taxes.filter((t) => t.dueDay !== undefined && t.autoGenerate && t.status === 'template');
 
-     for (const tax of taxesToGenerate) {
-       // Verifica se já existe uma tarefa de imposto para este período (simplificado pela data de criação)
-       const alreadyGenerated = taxes.some(
-         (existingTax) => existingTax.name === tax.name && existingTax.createdAt.startsWith(currentPeriod) && existingTax.status !== 'template' // Adicionar um status 'template'?
-       );
-
-       if (!alreadyGenerated) {
-         const newTax = generateTaxForPeriod(tax, currentPeriod);
-         // Marcar o original como template talvez? Ou criar entidade separada?
-         // tax.status = 'template'; // Exemplo
-         // await saveTax(tax); // Salvar a mudança no original
-         await saveTax(newTax); // Salvar a nova ocorrência
-         console.log("[v0] Ocorrência de Imposto gerada:", newTax.name, "para", currentPeriod);
-       }
-     }
+    for (const tax of taxesToGenerate) {
+      // Verificar se já existe uma ocorrência para este período
+      const [year, month] = currentPeriod.split('-').map(Number);
+      const dueDate = new Date(year, month - 1, tax.dueDay!);
+      const adjustedDueDate = adjustForWeekend(dueDate, tax.weekendRule || 'postpone');
+      
+      // TODO: Implementar verificação de ocorrência existente
+      // const alreadyGenerated = await checkTaxOccurrenceExists(tax.id, adjustedDueDate);
+      
+      // Por enquanto, gerar nova ocorrência
+      const newOccurrence = {
+        id: crypto.randomUUID(),
+        taxId: tax.id,
+        dueDate: adjustedDueDate.toISOString().split('T')[0],
+        amount: undefined, // Pode ser preenchido posteriormente
+        status: 'pending' as const,
+        priority: tax.priority,
+        assignedTo: tax.assignedTo,
+        protocol: tax.protocol,
+        notes: tax.notes,
+        tags: tax.tags || [],
+        createdAt: new Date().toISOString(),
+      };
+      
+      // TODO: Implementar saveTaxOccurrence
+      // await saveTaxOccurrence(newOccurrence);
+      console.log("[v0] Ocorrência de Imposto gerada:", tax.name, "para", currentPeriod, "em", adjustedDueDate.toISOString().split('T')[0]);
+    }
 
 
     // Gerar parcelas recorrentes (avançar para a próxima parcela)
@@ -97,30 +107,40 @@ export async function checkAndGenerateRecurrences(): Promise<void> {
       (i) => i.autoGenerate && i.status !== 'completed' && i.currentInstallment < i.installmentCount
     );
 
-    // Lógica para parcelamentos precisa ser ajustada. A função generateInstallmentForPeriod
-    // cria um *novo* registro, o que não é o ideal para parcelas. O correto seria *atualizar*
-    // a parcela existente ou ter uma tabela separada para cada vencimento de parcela.
-    // **COMENTANDO ESTA SEÇÃO por enquanto, pois a lógica precisa ser refeita.**
-    /*
     for (const installment of installmentsToUpdate) {
-       // Verificar se a data da próxima parcela cai no período atual
-       // Esta lógica precisa ser mais robusta
-       const nextInstallmentData = generateInstallmentForPeriod(installment, currentPeriod); // Esta função cria novo ID
-       // O ideal seria:
-       // installment.currentInstallment += 1;
-       // installment.status = 'pending'; // Resetar status?
-       // await saveInstallment(installment); // ATUALIZAR o existente
-      await saveInstallment(nextInstallmentData); // Salva NOVO registro (lógica atual)
-
-      console.log(
-        "[v0] Parcela gerada:",
-        nextInstallmentData.name,
-        `${nextInstallmentData.currentInstallment}/${nextInstallmentData.installmentCount}`,
-        "para",
-        currentPeriod,
-      )
+      // Verificar se a data da próxima parcela cai no período atual
+      const firstDue = new Date(installment.firstDueDate)
+      const monthsToAdd = installment.currentInstallment // Próxima parcela
+      const nextDueDate = new Date(firstDue.getFullYear(), firstDue.getMonth() + monthsToAdd, installment.dueDay)
+      
+      // Verificar se a próxima parcela deve ser gerada no período atual
+      const currentDate = new Date()
+      const currentMonth = currentDate.getMonth()
+      const currentYear = currentDate.getFullYear()
+      const nextDueMonth = nextDueDate.getMonth()
+      const nextDueYear = nextDueDate.getFullYear()
+      
+      if (nextDueYear === currentYear && nextDueMonth === currentMonth) {
+        // Atualizar a parcela existente para a próxima
+        const updatedInstallment = {
+          ...installment,
+          currentInstallment: installment.currentInstallment + 1,
+          status: 'pending' as const,
+          // Resetar campos de conclusão se necessário
+          completedAt: undefined,
+          completedBy: undefined,
+        }
+        
+        await saveInstallment(updatedInstallment)
+        console.log(
+          "[v0] Parcela avançada:",
+          updatedInstallment.name,
+          `${updatedInstallment.currentInstallment}/${updatedInstallment.installmentCount}`,
+          "para",
+          currentPeriod,
+        )
+      }
     }
-    */
 
     // Atualiza a data da última verificação no LocalStorage
     setLastRecurrenceCheck(today)

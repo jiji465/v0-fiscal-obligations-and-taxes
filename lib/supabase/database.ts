@@ -106,8 +106,8 @@ function mapObligationToDb(obligation: Obligation) {
     parent_obligation_id: obligation.parentObligationId || null,
     generated_for: obligation.generatedFor || null,
     tags: obligation.tags || [],
+    amount: obligation.amount || null,
     created_at: obligation.createdAt,
-    // amount: obligation.amount // Certifique-se que 'amount' existe na tabela se usar
   }
 }
 
@@ -139,8 +139,8 @@ function mapDbToObligation(row: any): Obligation {
     parentObligationId: row.parent_obligation_id,
     generatedFor: row.generated_for,
     tags: row.tags || [],
+    amount: row.amount,
     createdAt: row.created_at,
-    // amount: row.amount, // Adicionar se existir
     history: [],
   }
 }
@@ -171,8 +171,8 @@ function mapInstallmentToDb(installment: Installment) {
     auto_generate: installment.autoGenerate,
     recurrence: installment.recurrence,
     recurrence_interval: installment.recurrenceInterval || null,
+    installment_amount: installment.installmentAmount || null,
     created_at: installment.createdAt,
-    // installmentAmount: installment.installmentAmount // Certifique-se que existe na tabela
   }
 }
 
@@ -202,8 +202,8 @@ function mapDbToInstallment(row: any): Installment {
     autoGenerate: row.auto_generate,
     recurrence: row.recurrence,
     recurrenceInterval: row.recurrence_interval,
+    installmentAmount: row.installment_amount,
     createdAt: row.created_at,
-    // installmentAmount: row.installment_amount, // Adicionar se existir
     history: [],
   }
 }
@@ -211,6 +211,12 @@ function mapDbToInstallment(row: any): Installment {
 
 
 // Client Operations
+
+/**
+ * Fetches all clients from the database
+ * @returns Promise resolving to array of clients
+ * @throws Error if database operation fails
+ */
 export async function getClients(): Promise<Client[]> {
   const supabase = createClient()
   const { data, error } = await supabase.from("clients").select("*").order("name")
@@ -229,7 +235,11 @@ export async function getClients(): Promise<Client[]> {
   return data.map(mapDbToClient)
 }
 
-// ... (saveClient e deleteClient permanecem iguais) ...
+/**
+ * Saves a client to the database (creates or updates)
+ * @param client - Client object to save
+ * @throws Error if database operation fails
+ */
 export async function saveClient(client: Client): Promise<void> {
   const supabase = createClient()
   const dbClient = mapClientToDb(client)
@@ -242,6 +252,11 @@ export async function saveClient(client: Client): Promise<void> {
   }
 }
 
+/**
+ * Deletes a client from the database
+ * @param id - Client ID to delete
+ * @throws Error if database operation fails
+ */
 export async function deleteClient(id: string): Promise<void> {
   const supabase = createClient()
   const { error } = await supabase.from("clients").delete().eq("id", id)
@@ -254,6 +269,12 @@ export async function deleteClient(id: string): Promise<void> {
 
 
 // Tax Operations
+
+/**
+ * Fetches all taxes from the database
+ * @returns Promise resolving to array of taxes
+ * @throws Error if database operation fails
+ */
 export async function getTaxes(): Promise<Tax[]> {
   const supabase = createClient()
   const { data, error } = await supabase.from("taxes").select("*").order("name")
@@ -379,4 +400,191 @@ export async function deleteInstallment(id: string): Promise<void> {
     console.error("[v0] Error deleting installment:", error)
     throw error
   }
+}
+
+// Server-side filtering functions
+export interface ObligationFilters {
+  search?: string
+  clientId?: string
+  status?: string
+  priority?: string
+  sortBy?: 'dueDay' | 'client' | 'status' | 'createdAt'
+  sortOrder?: 'asc' | 'desc'
+  limit?: number
+  offset?: number
+}
+
+/**
+ * Fetches obligations with server-side filtering, sorting, and pagination
+ * @param filters - Filter and sort options
+ * @returns Filtered and sorted obligations
+ */
+export async function getObligationsFiltered(filters: ObligationFilters = {}): Promise<Obligation[]> {
+  const supabase = createClient()
+  let query = supabase.from("obligations").select("*")
+
+  // Apply search filter
+  if (filters.search) {
+    query = query.or(`name.ilike.%${filters.search}%,description.ilike.%${filters.search}%`)
+  }
+
+  // Apply client filter
+  if (filters.clientId) {
+    query = query.eq("client_id", filters.clientId)
+  }
+
+  // Apply status filter
+  if (filters.status) {
+    query = query.eq("status", filters.status)
+  }
+
+  // Apply priority filter
+  if (filters.priority) {
+    query = query.eq("priority", filters.priority)
+  }
+
+  // Apply sorting
+  const sortField = filters.sortBy || 'createdAt'
+  const sortOrder = filters.sortOrder || 'desc'
+  query = query.order(sortField, { ascending: sortOrder === 'asc' })
+
+  // Apply pagination
+  if (filters.limit) {
+    query = query.limit(filters.limit)
+  }
+  if (filters.offset) {
+    query = query.range(filters.offset, filters.offset + (filters.limit || 50) - 1)
+  }
+
+  const { data, error } = await query
+
+  if (error) {
+    console.error("[v0] Error fetching filtered obligations:", error)
+    return []
+  }
+
+  if (!data || !Array.isArray(data)) {
+    console.warn("[v0] No obligation data received or invalid format")
+    return []
+  }
+
+  return data.map(mapDbToObligation)
+}
+
+/**
+ * Fetches obligations with client and tax details for efficient server-side filtering
+ * @param filters - Filter and sort options
+ * @returns Filtered obligations with related data
+ */
+export async function getObligationsWithDetailsFiltered(filters: ObligationFilters = {}): Promise<any[]> {
+  const supabase = createClient()
+  let query = supabase
+    .from("obligations")
+    .select(`
+      *,
+      clients!inner(name, cnpj),
+      taxes(name, federal_tax_code)
+    `)
+
+  // Apply search filter (searches in obligation name, client name, and tax name)
+  if (filters.search) {
+    query = query.or(`
+      name.ilike.%${filters.search}%,
+      description.ilike.%${filters.search}%,
+      clients.name.ilike.%${filters.search}%,
+      taxes.name.ilike.%${filters.search}%
+    `)
+  }
+
+  // Apply client filter
+  if (filters.clientId) {
+    query = query.eq("client_id", filters.clientId)
+  }
+
+  // Apply status filter
+  if (filters.status) {
+    query = query.eq("status", filters.status)
+  }
+
+  // Apply priority filter
+  if (filters.priority) {
+    query = query.eq("priority", filters.priority)
+  }
+
+  // Apply sorting
+  const sortField = filters.sortBy || 'createdAt'
+  const sortOrder = filters.sortOrder || 'desc'
+  
+  if (sortField === 'client') {
+    query = query.order('clients.name', { ascending: sortOrder === 'asc' })
+  } else {
+    query = query.order(sortField, { ascending: sortOrder === 'asc' })
+  }
+
+  // Apply pagination
+  if (filters.limit) {
+    query = query.limit(filters.limit)
+  }
+  if (filters.offset) {
+    query = query.range(filters.offset, filters.offset + (filters.limit || 50) - 1)
+  }
+
+  const { data, error } = await query
+
+  if (error) {
+    console.error("[v0] Error fetching filtered obligations with details:", error)
+    return []
+  }
+
+  if (!data || !Array.isArray(data)) {
+    console.warn("[v0] No obligation data received or invalid format")
+    return []
+  }
+
+  return data.map(row => ({
+    ...mapDbToObligation(row),
+    client: {
+      id: row.clients.id,
+      name: row.clients.name,
+      cnpj: row.clients.cnpj
+    },
+    tax: row.taxes ? {
+      id: row.taxes.id,
+      name: row.taxes.name,
+      federalTaxCode: row.taxes.federal_tax_code
+    } : null
+  }))
+}
+
+/**
+ * Gets count of obligations matching filters (for pagination)
+ * @param filters - Filter options
+ * @returns Count of matching obligations
+ */
+export async function getObligationsCount(filters: ObligationFilters = {}): Promise<number> {
+  const supabase = createClient()
+  let query = supabase.from("obligations").select("*", { count: 'exact', head: true })
+
+  // Apply filters (same as getObligationsFiltered but only for counting)
+  if (filters.search) {
+    query = query.or(`name.ilike.%${filters.search}%,description.ilike.%${filters.search}%`)
+  }
+  if (filters.clientId) {
+    query = query.eq("client_id", filters.clientId)
+  }
+  if (filters.status) {
+    query = query.eq("status", filters.status)
+  }
+  if (filters.priority) {
+    query = query.eq("priority", filters.priority)
+  }
+
+  const { count, error } = await query
+
+  if (error) {
+    console.error("[v0] Error counting obligations:", error)
+    return 0
+  }
+
+  return count || 0
 }

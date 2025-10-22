@@ -1,8 +1,14 @@
-import type { DashboardStats, ObligationWithDetails, Client, Tax, Obligation } from "./types" // CORREÇÃO: Tipos importados
-// REMOVIDO: import { getClients, getTaxes, getObligations } from "./storage" // NÃO USAR STORAGE
-import { calculateDueDate, isOverdue, isUpcomingThisWeek } from "./date-utils"
+import type { DashboardStats, ObligationWithDetails, Client, Tax, Obligation } from "./types"
+import { calculateDueDate, isOverdue, isUpcomingThisWeek, adjustForWeekend } from "./date-utils"
+import { getNextDueDate } from "./recurrence-engine"
 
-// CORREÇÃO: A função agora recebe os dados como parâmetros
+/**
+ * Enriches obligations with client and tax details
+ * @param obligations - Array of obligations
+ * @param clients - Array of clients
+ * @param taxes - Array of taxes
+ * @returns Array of obligations with enriched details
+ */
 export const getObligationsWithDetails = (
   obligations: Obligation[],
   clients: Client[],
@@ -12,28 +18,30 @@ export const getObligationsWithDetails = (
     const client = clients.find((c) => c.id === obligation.clientId)!
     const tax = obligation.taxId ? taxes.find((t) => t.id === obligation.taxId) : undefined
 
-    // CORREÇÃO: Cálculo da data movido para cá para consistência
-    const dueDate = new Date() // Precisa de uma data de referência
-    let calculatedDate: Date;
-     if (obligation.frequency === "annual" && obligation.dueMonth) {
-        calculatedDate = new Date(dueDate.getFullYear(), obligation.dueMonth - 1, obligation.dueDay);
-        if (calculatedDate < dueDate && !obligation.generatedFor) { // Ajusta ano apenas se não for uma gerada
-            calculatedDate.setFullYear(calculatedDate.getFullYear() + 1);
+    // CORREÇÃO: Usar função padronizada do recurrence-engine
+    const currentDate = new Date()
+    let calculatedDate: Date
+
+    if (obligation.generatedFor) {
+      // Se for uma obrigação gerada, usar o ano/mês dela
+      const [year, month] = obligation.generatedFor.split('-').map(Number)
+      calculatedDate = new Date(year, month - 1, obligation.dueDay)
+    } else {
+      // Para obrigações originais, calcular a próxima data de vencimento
+      if (obligation.frequency === "annual" && obligation.dueMonth) {
+        calculatedDate = new Date(currentDate.getFullYear(), obligation.dueMonth - 1, obligation.dueDay)
+        if (calculatedDate < currentDate) {
+          calculatedDate.setFullYear(calculatedDate.getFullYear() + 1)
         }
-     } else {
-        calculatedDate = new Date(dueDate.getFullYear(), dueDate.getMonth(), obligation.dueDay);
-         if (calculatedDate < dueDate && !obligation.generatedFor) { // Ajusta mês apenas se não for uma gerada
-            calculatedDate.setMonth(calculatedDate.getMonth() + 1);
-         }
-     }
-     // Se for uma obrigação gerada, usar o ano/mês dela
-     if (obligation.generatedFor) {
-         const [year, month] = obligation.generatedFor.split('-').map(Number);
-         calculatedDate = new Date(year, month -1, obligation.dueDay);
-     }
+      } else {
+        calculatedDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), obligation.dueDay)
+        if (calculatedDate < currentDate) {
+          calculatedDate.setMonth(calculatedDate.getMonth() + 1)
+        }
+      }
+    }
 
-
-    const finalDueDate = adjustForWeekend(calculatedDate, obligation.weekendRule);
+    const finalDueDate = adjustForWeekend(calculatedDate, obligation.weekendRule)
 
 
     return {
@@ -45,7 +53,12 @@ export const getObligationsWithDetails = (
   })
 }
 
-// CORREÇÃO: A função agora recebe os dados como parâmetros
+/**
+ * Calculates dashboard statistics from clients and obligations
+ * @param clients - Array of clients
+ * @param obligations - Array of obligations with details
+ * @returns Dashboard statistics object
+ */
 export const calculateDashboardStats = (
   clients: Client[],
   obligations: ObligationWithDetails[],
@@ -78,27 +91,4 @@ export const calculateDashboardStats = (
   }
 }
 
-// CORREÇÃO: Função adjustForWeekend precisa estar aqui ou importada corretamente
-export const isWeekend = (date: Date): boolean => {
-  const day = date.getDay()
-  return day === 0 || day === 6 // 0 = Domingo, 6 = Sábado
-}
-
-export const adjustForWeekend = (date: Date, rule: "postpone" | "anticipate" | "keep"): Date => {
-  if (!isWeekend(date) || rule === 'keep') return date
-
-  const adjusted = new Date(date)
-
-  if (rule === "anticipate") {
-    // Move para dia útil anterior
-    while (isWeekend(adjusted)) {
-      adjusted.setDate(adjusted.getDate() - 1)
-    }
-  } else if (rule === "postpone") {
-    // Move para próximo dia útil
-    while (isWeekend(adjusted)) {
-      adjusted.setDate(adjusted.getDate() + 1)
-    }
-  }
-  return adjusted
-}
+// Date calculation functions are now consolidated in lib/date-utils.ts
