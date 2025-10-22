@@ -3,13 +3,19 @@
 import { useEffect, useState } from "react"
 import { Navigation } from "@/components/navigation"
 import { ClientList } from "@/components/client-list"
-import { getClients } from "@/lib/storage"
+import { getClients } from "@/lib/supabase/database" // CORREÇÃO: Importado do supabase
+import type { Client } from "@/lib/types" // CORREÇÃO: Importado o tipo
 
 export default function ClientesPage() {
-  const [clients, setClients] = useState(getClients())
+  const [clients, setClients] = useState<Client[]>([]) // CORREÇÃO: Tipagem explícita
+  const [loading, setLoading] = useState(true) // CORREÇÃO: Estado de carregamento
 
-  const handleUpdate = () => {
-    setClients(getClients())
+  // CORREÇÃO: Função async para buscar dados
+  const handleUpdate = async () => {
+    setLoading(true)
+    const clientsData = await getClients()
+    setClients(clientsData)
+    setLoading(false)
   }
 
   useEffect(() => {
@@ -25,8 +31,9 @@ export default function ClientesPage() {
             <h1 className="text-3xl font-bold tracking-tight">Clientes</h1>
             <p className="text-muted-foreground mt-2">Gerencie os clientes e suas informações</p>
           </div>
-
-          <ClientList clients={clients} onUpdate={handleUpdate} />
+          
+          {/* CORREÇÃO: Adicionado loader */}
+          {loading ? <p>Carregando clientes...</p> : <ClientList clients={clients} onUpdate={handleUpdate} />}
         </div>
       </main>
     </div>
