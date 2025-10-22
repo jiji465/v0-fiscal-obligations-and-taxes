@@ -1,0 +1,68 @@
+{
+  "navigation": {
+    "dashboard": "Panel",
+    "clients": "Clientes",
+    "taxes": "Impuestos",
+    "obligations": "Obligaciones",
+    "installments": "Cuotas",
+    "calendar": "Calendario",
+    "reports": "Reportes",
+    "alerts": "alertas",
+    "alert": "alerta"
+  },
+  "dashboard": {
+    "title": "Panel",
+    "subtitle": "Resumen de obligaciones fiscales y métricas de productividad",
+    "totalClients": "Total de Clientes",
+    "activeClients": "Clientes Activos",
+    "totalObligations": "Total de Obligaciones",
+    "pendingObligations": "Obligaciones Pendientes",
+    "completedThisMonth": "Completadas Este Mes",
+    "overdueObligations": "Obligaciones Vencidas",
+    "upcomingThisWeek": "Próximas Esta Semana"
+  },
+  "calendar": {
+    "title": "Calendario",
+    "subtitle": "Visualice las fechas de vencimiento de obligaciones, impuestos y cuotas"
+  },
+  "obligations": {
+    "title": "Obligaciones",
+    "subtitle": "Gestione todas las obligaciones fiscales de sus clientes",
+    "newObligation": "Nueva Obligación",
+    "editObligation": "Editar Obligación",
+    "name": "Nombre de la Obligación",
+    "description": "Descripción",
+    "client": "Cliente",
+    "tax": "Impuesto",
+    "dueDay": "Día de Vencimiento",
+    "dueMonth": "Mes Específico",
+    "priority": "Prioridad",
+    "status": "Estado",
+    "assignedTo": "Asignado a",
+    "protocol": "Protocolo",
+    "amount": "Monto (USD)",
+    "notes": "Notas",
+    "tags": "Etiquetas"
+  },
+  "status": {
+    "pending": "Pendiente",
+    "in_progress": "En Progreso",
+    "completed": "Completada",
+    "overdue": "Vencida"
+  },
+  "priority": {
+    "low": "Baja",
+    "medium": "Media",
+    "high": "Alta",
+    "urgent": "Urgente"
+  },
+  "common": {
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "edit": "Editar",
+    "delete": "Eliminar",
+    "loading": "Cargando...",
+    "error": "Error",
+    "success": "Éxito"
+  }
+}

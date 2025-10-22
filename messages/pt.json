@@ -1,0 +1,68 @@
+{
+  "navigation": {
+    "dashboard": "Dashboard",
+    "clients": "Clientes",
+    "taxes": "Impostos",
+    "obligations": "Obrigações",
+    "installments": "Parcelamentos",
+    "calendar": "Calendário",
+    "reports": "Relatórios",
+    "alerts": "alertas",
+    "alert": "alerta"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "subtitle": "Visão geral das obrigações fiscais e métricas de produtividade",
+    "totalClients": "Total de Clientes",
+    "activeClients": "Clientes Ativos",
+    "totalObligations": "Total de Obrigações",
+    "pendingObligations": "Obrigações Pendentes",
+    "completedThisMonth": "Concluídas Este Mês",
+    "overdueObligations": "Obrigações Atrasadas",
+    "upcomingThisWeek": "Próximas Esta Semana"
+  },
+  "calendar": {
+    "title": "Calendário",
+    "subtitle": "Visualize os vencimentos de obrigações, impostos e parcelamentos"
+  },
+  "obligations": {
+    "title": "Obrigações",
+    "subtitle": "Gerencie todas as obrigações fiscais dos seus clientes",
+    "newObligation": "Nova Obrigação",
+    "editObligation": "Editar Obrigação",
+    "name": "Nome da Obrigação",
+    "description": "Descrição",
+    "client": "Cliente",
+    "tax": "Imposto",
+    "dueDay": "Dia do Vencimento",
+    "dueMonth": "Mês Específico",
+    "priority": "Prioridade",
+    "status": "Status",
+    "assignedTo": "Responsável",
+    "protocol": "Protocolo",
+    "amount": "Valor (R$)",
+    "notes": "Observações",
+    "tags": "Tags"
+  },
+  "status": {
+    "pending": "Pendente",
+    "in_progress": "Em Andamento",
+    "completed": "Concluída",
+    "overdue": "Atrasada"
+  },
+  "priority": {
+    "low": "Baixa",
+    "medium": "Média",
+    "high": "Alta",
+    "urgent": "Urgente"
+  },
+  "common": {
+    "save": "Salvar",
+    "cancel": "Cancelar",
+    "edit": "Editar",
+    "delete": "Excluir",
+    "loading": "Carregando...",
+    "error": "Erro",
+    "success": "Sucesso"
+  }
+}

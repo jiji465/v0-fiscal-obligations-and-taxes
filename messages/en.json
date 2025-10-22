@@ -1,0 +1,68 @@
+{
+  "navigation": {
+    "dashboard": "Dashboard",
+    "clients": "Clients",
+    "taxes": "Taxes",
+    "obligations": "Obligations",
+    "installments": "Installments",
+    "calendar": "Calendar",
+    "reports": "Reports",
+    "alerts": "alerts",
+    "alert": "alert"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "subtitle": "Overview of fiscal obligations and productivity metrics",
+    "totalClients": "Total Clients",
+    "activeClients": "Active Clients",
+    "totalObligations": "Total Obligations",
+    "pendingObligations": "Pending Obligations",
+    "completedThisMonth": "Completed This Month",
+    "overdueObligations": "Overdue Obligations",
+    "upcomingThisWeek": "Upcoming This Week"
+  },
+  "calendar": {
+    "title": "Calendar",
+    "subtitle": "View due dates for obligations, taxes and installments"
+  },
+  "obligations": {
+    "title": "Obligations",
+    "subtitle": "Manage all fiscal obligations for your clients",
+    "newObligation": "New Obligation",
+    "editObligation": "Edit Obligation",
+    "name": "Obligation Name",
+    "description": "Description",
+    "client": "Client",
+    "tax": "Tax",
+    "dueDay": "Due Day",
+    "dueMonth": "Specific Month",
+    "priority": "Priority",
+    "status": "Status",
+    "assignedTo": "Assigned To",
+    "protocol": "Protocol",
+    "amount": "Amount (USD)",
+    "notes": "Notes",
+    "tags": "Tags"
+  },
+  "status": {
+    "pending": "Pending",
+    "in_progress": "In Progress",
+    "completed": "Completed",
+    "overdue": "Overdue"
+  },
+  "priority": {
+    "low": "Low",
+    "medium": "Medium",
+    "high": "High",
+    "urgent": "Urgent"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "edit": "Edit",
+    "delete": "Delete",
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success"
+  }
+}
