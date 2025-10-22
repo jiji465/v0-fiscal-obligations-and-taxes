@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Zap, CheckCircle2, PlayCircle, AlertTriangle, FileText } from "lucide-react"
 import type { ObligationWithDetails } from "@/lib/types"
-import { saveObligation } from "@/lib/storage"
+import { saveObligation } from "@/lib/supabase/database" // CORREÇÃO: Importado do supabase
 
 type QuickActionsProps = {
   obligations: ObligationWithDetails[]
@@ -18,48 +18,54 @@ export function QuickActions({ obligations, onUpdate }: QuickActionsProps) {
     (o) => new Date(o.calculatedDueDate) < new Date() && o.status !== "completed",
   )
 
-  const handleBulkComplete = (obligationList: ObligationWithDetails[]) => {
+  const handleBulkComplete = async (obligationList: ObligationWithDetails[]) => { // CORREÇÃO: Adicionado async
     if (confirm(`Tem certeza que deseja marcar ${obligationList.length} obrigação(ões) como concluída(s)?`)) {
-      obligationList.forEach((obligation) => {
-        const updated = {
-          ...obligation,
-          status: "completed" as const,
-          completedAt: new Date().toISOString(),
-          realizationDate: new Date().toISOString().split("T")[0],
-          history: [
-            ...(obligation.history || []),
-            {
-              id: crypto.randomUUID(),
-              action: "completed" as const,
-              description: "Obrigação marcada como concluída (ação em lote)",
-              timestamp: new Date().toISOString(),
-            },
-          ],
-        }
-        saveObligation(updated)
-      })
+      // CORREÇÃO: Usar Promise.all para aguardar todas as atualizações
+      await Promise.all(
+        obligationList.map((obligation) => {
+          const updated = {
+            ...obligation,
+            status: "completed" as const,
+            completedAt: new Date().toISOString(),
+            realizationDate: new Date().toISOString().split("T")[0],
+            history: [
+              ...(obligation.history || []),
+              {
+                id: crypto.randomUUID(),
+                action: "completed" as const,
+                description: "Obrigação marcada como concluída (ação em lote)",
+                timestamp: new Date().toISOString(),
+              },
+            ],
+          }
+          return saveObligation(updated) // CORREÇÃO: Função agora é async
+        }),
+      )
       onUpdate()
     }
   }
 
-  const handleBulkStart = (obligationList: ObligationWithDetails[]) => {
+  const handleBulkStart = async (obligationList: ObligationWithDetails[]) => { // CORREÇÃO: Adicionado async
     if (confirm(`Tem certeza que deseja iniciar ${obligationList.length} obrigação(ões)?`)) {
-      obligationList.forEach((obligation) => {
-        const updated = {
-          ...obligation,
-          status: "in_progress" as const,
-          history: [
-            ...(obligation.history || []),
-            {
-              id: crypto.randomUUID(),
-              action: "status_changed" as const,
-              description: "Status alterado para Em Andamento (ação em lote)",
-              timestamp: new Date().toISOString(),
-            },
-          ],
-        }
-        saveObligation(updated)
-      })
+      // CORREÇÃO: Usar Promise.all
+      await Promise.all(
+        obligationList.map((obligation) => {
+          const updated = {
+            ...obligation,
+            status: "in_progress" as const,
+            history: [
+              ...(obligation.history || []),
+              {
+                id: crypto.randomUUID(),
+                action: "status_changed" as const,
+                description: "Status alterado para Em Andamento (ação em lote)",
+                timestamp: new Date().toISOString(),
+              },
+            ],
+          }
+          return saveObligation(updated) // CORREÇÃO: Função agora é async
+        }),
+      )
       onUpdate()
     }
   }
