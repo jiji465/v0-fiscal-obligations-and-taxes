@@ -1,8 +1,7 @@
 import { createClient } from "./client"
 import type { Client, Tax, Obligation, Installment } from "../types"
 
-// --- Funções de Mapeamento (mapClientToDb, mapDbToClient, etc.) permanecem iguais ---
-// ... (cole aqui as funções de mapeamento que já existem no seu ficheiro) ...
+// Mapeamento de tipos TypeScript para formato do banco
 function mapClientToDb(client: Client) {
   return {
     id: client.id,
@@ -44,11 +43,6 @@ function mapTaxToDb(tax: Tax) {
     completed_by: tax.completedBy || null,
     tags: tax.tags || [],
     created_at: tax.createdAt,
-     // Campos adicionados na correção anterior
-     auto_generate: tax.autoGenerate === undefined ? true : tax.autoGenerate,
-     recurrence: tax.recurrence || 'monthly',
-     recurrence_interval: tax.recurrenceInterval || null,
-     weekend_rule: tax.weekendRule || 'postpone'
   }
 }
 
@@ -69,11 +63,6 @@ function mapDbToTax(row: any): Tax {
     completedBy: row.completed_by,
     tags: row.tags || [],
     createdAt: row.created_at,
-    // Campos adicionados
-    autoGenerate: row.auto_generate,
-    recurrence: row.recurrence,
-    recurrenceInterval: row.recurrence_interval,
-    weekendRule: row.weekend_rule,
     history: [], // Histórico será carregado separadamente se necessário
   }
 }
@@ -107,7 +96,6 @@ function mapObligationToDb(obligation: Obligation) {
     generated_for: obligation.generatedFor || null,
     tags: obligation.tags || [],
     created_at: obligation.createdAt,
-    // amount: obligation.amount // Certifique-se que 'amount' existe na tabela se usar
   }
 }
 
@@ -140,7 +128,6 @@ function mapDbToObligation(row: any): Obligation {
     generatedFor: row.generated_for,
     tags: row.tags || [],
     createdAt: row.created_at,
-    // amount: row.amount, // Adicionar se existir
     history: [],
   }
 }
@@ -172,7 +159,6 @@ function mapInstallmentToDb(installment: Installment) {
     recurrence: installment.recurrence,
     recurrence_interval: installment.recurrenceInterval || null,
     created_at: installment.createdAt,
-    // installmentAmount: installment.installmentAmount // Certifique-se que existe na tabela
   }
 }
 
@@ -203,12 +189,9 @@ function mapDbToInstallment(row: any): Installment {
     recurrence: row.recurrence,
     recurrenceInterval: row.recurrence_interval,
     createdAt: row.created_at,
-    // installmentAmount: row.installment_amount, // Adicionar se existir
     history: [],
   }
 }
-// --- Fim das Funções de Mapeamento ---
-
 
 // Client Operations
 export async function getClients(): Promise<Client[]> {
@@ -216,20 +199,13 @@ export async function getClients(): Promise<Client[]> {
   const { data, error } = await supabase.from("clients").select("*").order("name")
 
   if (error) {
-    console.error("[v0] Error fetching clients:", error) // Mantém o log do erro
-    return [] // **Retorna array vazio em caso de erro**
-  }
-
-  // Adiciona verificação se data é null ou não é array
-  if (!data || !Array.isArray(data)) {
-      console.warn("[v0] No client data received or invalid format");
-      return [];
+    console.error("[v0] Error fetching clients:", error)
+    return []
   }
 
   return data.map(mapDbToClient)
 }
 
-// ... (saveClient e deleteClient permanecem iguais) ...
 export async function saveClient(client: Client): Promise<void> {
   const supabase = createClient()
   const dbClient = mapClientToDb(client)
@@ -238,7 +214,7 @@ export async function saveClient(client: Client): Promise<void> {
 
   if (error) {
     console.error("[v0] Error saving client:", error)
-    throw error // Re-lança o erro para a UI tratar se necessário
+    throw error
   }
 }
 
@@ -252,7 +228,6 @@ export async function deleteClient(id: string): Promise<void> {
   }
 }
 
-
 // Tax Operations
 export async function getTaxes(): Promise<Tax[]> {
   const supabase = createClient()
@@ -260,18 +235,12 @@ export async function getTaxes(): Promise<Tax[]> {
 
   if (error) {
     console.error("[v0] Error fetching taxes:", error)
-    return [] // **Retorna array vazio em caso de erro**
-  }
-
-  if (!data || !Array.isArray(data)) {
-      console.warn("[v0] No tax data received or invalid format");
-      return [];
+    return []
   }
 
   return data.map(mapDbToTax)
 }
 
-// ... (saveTax e deleteTax permanecem iguais) ...
 export async function saveTax(tax: Tax): Promise<void> {
   const supabase = createClient()
   const dbTax = mapTaxToDb(tax)
@@ -297,24 +266,16 @@ export async function deleteTax(id: string): Promise<void> {
 // Obligation Operations
 export async function getObligations(): Promise<Obligation[]> {
   const supabase = createClient()
-  // CORREÇÃO: Ordenar por algo que faça mais sentido, talvez `created_at` ou `name`?
-  // A data de vencimento calculada não está no banco. Ordenar por `due_day` pode ser enganoso.
-  const { data, error } = await supabase.from("obligations").select("*").order("created_at", { ascending: false })
+  const { data, error } = await supabase.from("obligations").select("*").order("due_day")
 
   if (error) {
     console.error("[v0] Error fetching obligations:", error)
-    return [] // **Retorna array vazio em caso de erro**
-  }
-
-   if (!data || !Array.isArray(data)) {
-      console.warn("[v0] No obligation data received or invalid format");
-      return [];
+    return []
   }
 
   return data.map(mapDbToObligation)
 }
 
-// ... (saveObligation e deleteObligation permanecem iguais) ...
 export async function saveObligation(obligation: Obligation): Promise<void> {
   const supabase = createClient()
   const dbObligation = mapObligationToDb(obligation)
@@ -337,32 +298,23 @@ export async function deleteObligation(id: string): Promise<void> {
   }
 }
 
-
 // Installment Operations
 export async function getInstallments(): Promise<Installment[]> {
   const supabase = createClient()
-   // CORREÇÃO: Ordenar por `first_due_date` e `current_installment` talvez?
-  const { data, error } = await supabase.from("installments").select("*").order("first_due_date").order("current_installment")
+  const { data, error } = await supabase.from("installments").select("*").order("due_day")
 
   if (error) {
     console.error("[v0] Error fetching installments:", error)
-    return [] // **Retorna array vazio em caso de erro**
-  }
-
-  if (!data || !Array.isArray(data)) {
-      console.warn("[v0] No installment data received or invalid format");
-      return [];
+    return []
   }
 
   return data.map(mapDbToInstallment)
 }
 
-// ... (saveInstallment e deleteInstallment permanecem iguais) ...
 export async function saveInstallment(installment: Installment): Promise<void> {
   const supabase = createClient()
   const dbInstallment = mapInstallmentToDb(installment)
 
-  // Use `upsert` com `onConflict` se quiser garantir IDs únicos ou outra lógica
   const { error } = await supabase.from("installments").upsert(dbInstallment)
 
   if (error) {

@@ -8,59 +8,32 @@ import { UpcomingObligations } from "@/components/upcoming-obligations"
 import { ClientOverview } from "@/components/client-overview"
 import { TaxCalendar } from "@/components/tax-calendar"
 import { QuickActions } from "@/components/quick-actions"
-import { getClients, getTaxes, getInstallments, getObligations } from "@/lib/supabase/database" // CORREÇÃO
-import { calculateDashboardStats, getObligationsWithDetails } from "@/lib/dashboard-utils"
+import { getClients, getTaxes, getInstallments } from "@/lib/storage"
+import { getObligationsWithDetails, calculateDashboardStats } from "@/lib/dashboard-utils"
 import { TrendingUp, CalendarIcon, AlertCircle, CreditCard } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { adjustForWeekend } from "@/lib/date-utils"
-import type { Client, Tax, Installment, ObligationWithDetails, DashboardStats } from "@/lib/types" // CORREÇÃO
 
 export default function DashboardPage() {
-  // CORREÇÃO: Estados tipados e inicializados
-  const [stats, setStats] = useState<DashboardStats>({
-    totalClients: 0,
-    activeClients: 0,
-    totalObligations: 0,
-    pendingObligations: 0,
-    completedThisMonth: 0,
-    overdueObligations: 0,
-    upcomingThisWeek: 0,
-  })
-  const [obligations, setObligations] = useState<ObligationWithDetails[]>([])
-  const [clients, setClients] = useState<Client[]>([])
-  const [taxes, setTaxes] = useState<Tax[]>([])
-  const [installments, setInstallments] = useState<Installment[]>([])
-  const [loading, setLoading] = useState(true)
+  const [stats, setStats] = useState(calculateDashboardStats())
+  const [obligations, setObligations] = useState(getObligationsWithDetails())
+  const [clients, setClients] = useState(getClients())
+  const [taxes, setTaxes] = useState(getTaxes())
+  const [installments, setInstallments] = useState(getInstallments())
 
-  // CORREÇÃO: Função de atualização async
-  const updateData = async () => {
-    setLoading(true)
-    const [clientsData, taxesData, installmentsData, obligationsData] = await Promise.all([
-      getClients(),
-      getTaxes(),
-      getInstallments(),
-      getObligations(),
-    ])
-
-    const obligationsWithDetails = getObligationsWithDetails(obligationsData, clientsData, taxesData)
-    const dashboardStats = calculateDashboardStats(clientsData, obligationsWithDetails)
-
-    setClients(clientsData)
-    setTaxes(taxesData)
-    setInstallments(installmentsData)
-    setObligations(obligationsWithDetails)
-    setStats(dashboardStats)
-    setLoading(false)
+  const updateData = () => {
+    setStats(calculateDashboardStats())
+    setObligations(getObligationsWithDetails())
+    setClients(getClients())
+    setTaxes(getTaxes())
+    setInstallments(getInstallments())
   }
 
   useEffect(() => {
     updateData()
   }, [])
 
-  // O resto do seu código continua igual, apenas as lógicas de busca de dados mudam
-  // ... (código dos alertas, etc.)
-  
   const criticalAlerts = obligations.filter(
     (o) => o.status === "overdue" || (o.status === "pending" && new Date(o.calculatedDueDate) <= new Date()),
   )
@@ -91,17 +64,6 @@ export default function DashboardPage() {
     const nextWeek = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)
     return adjustedDueDate >= today && adjustedDueDate <= nextWeek
   })
-
-  if (loading) {
-    return (
-       <div className="min-h-screen bg-background">
-        <Navigation />
-        <main className="container mx-auto px-4 py-8">
-            <p className="text-center">Carregando dashboard...</p>
-        </main>
-       </div>
-    )
-  }
 
   return (
     <div className="min-h-screen bg-background">
