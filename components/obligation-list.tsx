@@ -72,7 +72,7 @@ export function ObligationList({ obligations, clients, taxes, onUpdate }: Obliga
     return matchesSearch && matchesClient
   })
 
-  // --- Verificação na Ordenação (já estava correta, mas mantendo) ---
+  // --- Verificação na Ordenação ---
   const sortedObligations = [...filteredObligations].sort((a, b) => {
     // Garante que a e b não sejam null/undefined
     if (!a || !b) return 0;
@@ -100,12 +100,11 @@ export function ObligationList({ obligations, clients, taxes, onUpdate }: Obliga
         comparison = statusOrder[getRealStatus(a)] - statusOrder[getRealStatus(b)]
     }
 
-
     return sortOrder === "asc" ? comparison : -comparison
   })
 
 
-  // --- Funções handleSave, handleDelete, handleComplete, handleInProgress (já corrigidas) ---
+  // --- Funções handleSave, handleDelete, handleComplete, handleInProgress ---
     const handleSave = async (obligationData: Obligation) => { // Aceita Obligation base
     try {
         await saveObligation(obligationData) // Salva no Supabase
@@ -175,7 +174,7 @@ export function ObligationList({ obligations, clients, taxes, onUpdate }: Obliga
     await handleSave(updatedObligation);
   }
 
-  // --- Funções handleEdit, handleView, handleNew (sem alterações) ---
+  // --- Funções handleEdit, handleView, handleNew ---
   const handleEdit = (obligation: ObligationWithDetails) => {
     setEditingObligation(obligation)
     setIsFormOpen(true)
@@ -191,12 +190,12 @@ export function ObligationList({ obligations, clients, taxes, onUpdate }: Obliga
     setIsFormOpen(true)
   }
 
-  // --- Funções getRelativeDate, getStatusBadge (já corrigidas) ---
+  // --- Funções getRelativeDate, getStatusBadge ---
   const getRelativeDate = (dateString: string) => {
-    if (!dateString) return "-"; // Adiciona verificação para data inválida
+    if (!dateString) return "-";
     try {
         const date = new Date(dateString)
-        if (isNaN(date.getTime())) return "-"; // Retorna se a data for inválida
+        if (isNaN(date.getTime())) return "-";
 
         const today = new Date()
         today.setHours(0, 0, 0, 0)
@@ -215,7 +214,7 @@ export function ObligationList({ obligations, clients, taxes, onUpdate }: Obliga
         return formatDate(dateString)
     } catch (e) {
         console.error("Erro ao formatar data relativa:", dateString, e);
-        return "-"; // Retorna em caso de erro
+        return "-";
     }
   }
 
@@ -264,7 +263,7 @@ export function ObligationList({ obligations, clients, taxes, onUpdate }: Obliga
     )
   }
 
-  // --- Função toggleSort (sem alterações) ---
+  // --- Função toggleSort ---
   const toggleSort = (field: "dueDate" | "client" | "status") => {
     if (sortBy === field) {
       setSortOrder(sortOrder === "asc" ? "desc" : "asc")
@@ -274,7 +273,7 @@ export function ObligationList({ obligations, clients, taxes, onUpdate }: Obliga
     }
   }
 
-  // --- Componente QuickActionButtons (já corrigido) ---
+  // --- Componente QuickActionButtons ---
     const QuickActionButtons = ({ obligation }: { obligation: ObligationWithDetails }) => {
     // Garante que obligation não seja null/undefined
     if (!obligation) return null;
@@ -312,13 +311,13 @@ export function ObligationList({ obligations, clients, taxes, onUpdate }: Obliga
         )}
         </div>
     );
-    }
+    } // <- Certifique-se que esta chave está fechando a função QuickActionButtons
 
 
   // --- JSX de Renderização ---
   return (
     <div className="space-y-4">
-      {/* Barra de busca e botões (sem alterações significativas) */}
+      {/* Barra de busca e botões */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
@@ -346,7 +345,7 @@ export function ObligationList({ obligations, clients, taxes, onUpdate }: Obliga
         </div>
       </div>
 
-      {/* Filtros (sem alterações significativas) */}
+      {/* Filtros */}
       {showFilters && (
         <div className="grid sm:grid-cols-2 gap-4 p-4 border rounded-lg bg-muted/50">
           <div className="grid gap-2">
@@ -425,9 +424,19 @@ export function ObligationList({ obligations, clients, taxes, onUpdate }: Obliga
                         {obligation.priority && obligation.priority !== "medium" && (
                           <Badge
                             variant="outline"
-                            className={ /* ... classes de prioridade ... */ }
+                            className={
+                              obligation.priority === "urgent"
+                                ? "border-red-500 text-red-700 dark:text-red-400"
+                                : obligation.priority === "high"
+                                  ? "border-orange-500 text-orange-700 dark:text-orange-400"
+                                  : "border-blue-500 text-blue-700 dark:text-blue-400" // Assumindo 'low' é azul
+                            }
                           >
-                            {/* ... texto da prioridade ... */}
+                            {obligation.priority === "urgent"
+                              ? "Urgente"
+                              : obligation.priority === "high"
+                                ? "Alta"
+                                : "Baixa"}
                           </Badge>
                         )}
                       </div>
@@ -519,4 +528,4 @@ export function ObligationList({ obligations, clients, taxes, onUpdate }: Obliga
       )}
     </div>
   )
-}
+} // <- Certifique-se que esta chave fecha o componente ObligationList
