@@ -3,18 +3,38 @@
 import { useEffect, useState } from "react"
 import { Navigation } from "@/components/navigation"
 import { ClientList } from "@/components/client-list"
-import { getClients } from "@/lib/storage"
+// Importa a função correta do Supabase database
+import { getClients as getClientsFromDb } from "@/lib/supabase/database"
+import type { Client } from "@/lib/types" // Importa o tipo Client
 
 export default function ClientesPage() {
-  const [clients, setClients] = useState(getClients())
+  // Inicializa o estado como um array vazio
+  const [clients, setClients] = useState<Client[]>([])
+  const [loading, setLoading] = useState(true); // Estado para indicar carregamento
 
-  const handleUpdate = () => {
-    setClients(getClients())
+  // Função assíncrona para carregar dados do Supabase
+  const loadClients = async () => {
+    setLoading(true); // Inicia o carregamento
+    try {
+      const clientsData = await getClientsFromDb(); // Busca do Supabase
+      setClients(clientsData); // Atualiza o estado com os dados do Supabase
+    } catch (error) {
+      console.error("[v0] Erro ao buscar clientes do Supabase:", error);
+      // Opcional: Mostrar uma mensagem de erro para o usuário
+    } finally {
+      setLoading(false); // Finaliza o carregamento
+    }
   }
 
+  // useEffect para carregar os dados quando a página montar
   useEffect(() => {
-    handleUpdate()
+    loadClients();
   }, [])
+
+  // handleUpdate agora chama loadClients para rebuscar do Supabase
+  const handleUpdate = () => {
+    loadClients();
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -26,7 +46,13 @@ export default function ClientesPage() {
             <p className="text-muted-foreground mt-2">Gerencie os clientes e suas informações</p>
           </div>
 
-          <ClientList clients={clients} onUpdate={handleUpdate} />
+          {/* Mostra mensagem de carregamento ou a lista */}
+          {loading ? (
+            <p className="text-center text-muted-foreground">Carregando clientes...</p>
+          ) : (
+            <ClientList clients={clients} onUpdate={handleUpdate} />
+          )}
+
         </div>
       </main>
     </div>
