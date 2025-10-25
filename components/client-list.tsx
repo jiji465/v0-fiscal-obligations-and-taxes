@@ -9,11 +9,12 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { ClientForm } from "./client-form"
 import { MoreVertical, Pencil, Trash2, Search, Plus } from "lucide-react"
 import type { Client } from "@/lib/types"
-import { saveClient, deleteClient } from "@/lib/supabase/database"
+// Importa as funções corretas do Supabase database
+import { saveClient, deleteClient as deleteClientFromDb } from "@/lib/supabase/database"
 
 type ClientListProps = {
   clients: Client[]
-  onUpdate: () => void
+  onUpdate: () => void // Função para recarregar a lista na página pai
 }
 
 export function ClientList({ clients, onUpdate }: ClientListProps) {
@@ -22,21 +23,37 @@ export function ClientList({ clients, onUpdate }: ClientListProps) {
   const [isFormOpen, setIsFormOpen] = useState(false)
 
   const filteredClients = clients.filter(
-    (client) => client.name.toLowerCase().includes(search.toLowerCase()) || client.cnpj.includes(search),
-  )
+    (client) =>
+      (client.name?.toLowerCase() || '').includes(search.toLowerCase()) || // Acesso seguro
+      (client.cnpj || '').includes(search), // Acesso seguro
+  );
 
-  const handleSave = (client: Client) => {
-    saveClient(client)
-    onUpdate()
-    setEditingClient(undefined)
-  }
 
-  const handleDelete = (id: string) => {
-    if (confirm("Tem certeza que deseja excluir este cliente?")) {
-      deleteClient(id)
-      onUpdate()
+  const handleSave = async (client: Client) => {
+    try {
+      await saveClient(client); // Salva no Supabase
+      onUpdate(); // Chama a função para recarregar a lista na página pai
+      setEditingClient(undefined);
+      setIsFormOpen(false);
+    } catch (error) {
+       console.error("[v0] Erro ao salvar cliente:", error);
+       alert("Erro ao salvar cliente. Verifique o console.");
     }
-  }
+  };
+
+  // Garante que handleDelete é async e chama onUpdate APÓS o await
+  const handleDelete = async (id: string) => {
+    if (confirm("Tem certeza que deseja excluir este cliente?")) {
+      try {
+        await deleteClientFromDb(id); // Deleta do Supabase (renomeado para evitar conflito)
+        onUpdate(); // Chama a função para recarregar a lista APÓS a exclusão
+      } catch (error) {
+        console.error("[v0] Erro ao deletar cliente:", error);
+        alert("Erro ao deletar cliente. Verifique o console.");
+      }
+    }
+  };
+
 
   const handleEdit = (client: Client) => {
     setEditingClient(client)
@@ -88,10 +105,11 @@ export function ClientList({ clients, onUpdate }: ClientListProps) {
             ) : (
               filteredClients.map((client) => (
                 <TableRow key={client.id}>
-                  <TableCell className="font-medium">{client.name}</TableCell>
-                  <TableCell className="font-mono text-sm">{client.cnpj}</TableCell>
-                  <TableCell>{client.email}</TableCell>
-                  <TableCell>{client.phone}</TableCell>
+                  {/* Acesso seguro às propriedades */}
+                  <TableCell className="font-medium">{client.name ?? 'Nome Inválido'}</TableCell>
+                  <TableCell className="font-mono text-sm">{client.cnpj ?? '-'}</TableCell>
+                  <TableCell>{client.email || '-'}</TableCell>
+                  <TableCell>{client.phone || '-'}</TableCell>
                   <TableCell>
                     <Badge variant={client.status === "active" ? "default" : "secondary"}>
                       {client.status === "active" ? "Ativo" : "Inativo"}
@@ -109,6 +127,7 @@ export function ClientList({ clients, onUpdate }: ClientListProps) {
                           <Pencil className="size-4 mr-2" />
                           Editar
                         </DropdownMenuItem>
+                        {/* Chama handleDelete com o ID */}
                         <DropdownMenuItem onClick={() => handleDelete(client.id)} className="text-destructive">
                           <Trash2 className="size-4 mr-2" />
                           Excluir
@@ -123,6 +142,7 @@ export function ClientList({ clients, onUpdate }: ClientListProps) {
         </Table>
       </div>
 
+      {/* Passa a função handleSave correta */}
       <ClientForm client={editingClient} open={isFormOpen} onOpenChange={setIsFormOpen} onSave={handleSave} />
     </div>
   )
